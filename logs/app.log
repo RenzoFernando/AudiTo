@@ -1,0 +1,19 @@
+2026-08-07 12:23:17,669 | INFO | app.infrastructure.logging_setup | Classcribe 0.1.0 iniciado
+2026-08-07 12:24:04,184 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/agent-harnesses "HTTP/1.1 200 OK"
+2026-08-07 12:24:04,377 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/Systran/faster-whisper-medium/revision/main "HTTP/1.1 200 OK"
+2026-08-07 12:24:04,573 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/Systran/faster-whisper-medium/tree/08e178d48790749d25932bbc082711ddcfdfbc4f?recursive=true&expand=false "HTTP/1.1 200 OK"
+2026-08-07 12:24:04,782 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/config.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-07 12:24:04,784 | WARNING | huggingface_hub.utils._http | Warning: You are sending unauthenticated requests to the HF Hub. Please set a HF_TOKEN to enable higher rate limits and faster downloads.
+2026-08-07 12:24:04,800 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Systran/faster-whisper-medium/08e178d48790749d25932bbc082711ddcfdfbc4f/config.json "HTTP/1.1 200 OK"
+2026-08-07 12:24:04,822 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/resolve-cache/models/Systran/faster-whisper-medium/08e178d48790749d25932bbc082711ddcfdfbc4f/config.json "HTTP/1.1 200 OK"
+2026-08-07 12:24:04,823 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/vocabulary.txt "HTTP/1.1 307 Temporary Redirect"
+2026-08-07 12:24:04,823 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/Systran/faster-whisper-medium/resolve/08e178d48790749d25932bbc082711ddcfdfbc4f/tokenizer.json "HTTP/1.1 307 Temporary Redirect"
+2026-08-07 12:24:04,844 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Systran/faster-whisper-medium/08e178d48790749d25932bbc082711ddcfdfbc4f/tokenizer.json "HTTP/1.1 200 OK"
+2026-08-07 12:24:04,844 | INFO | httpx | HTTP Request: HEAD https://huggingface.co/api/resolve-cache/models/Systran/faster-whisper-medium/08e178d48790749d25932bbc082711ddcfdfbc4f/vocabulary.txt "HTTP/1.1 200 OK"
+2026-08-07 12:24:04,877 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/resolve-cache/models/Systran/faster-whisper-medium/08e178d48790749d25932bbc082711ddcfdfbc4f/vocabulary.txt "HTTP/1.1 200 OK"
+2026-08-07 12:24:04,878 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/resolve-cache/models/Systran/faster-whisper-medium/08e178d48790749d25932bbc082711ddcfdfbc4f/tokenizer.json "HTTP/1.1 200 OK"
+2026-08-07 12:27:03,952 | INFO | app.infrastructure.whisper.faster_whisper_engine | Modelo cargado: profile=Equilibrada model=medium device=cpu
+2026-08-07 12:27:16,562 | INFO | faster_whisper | Processing audio with duration 01:29:54.880
+2026-08-07 12:27:40,259 | INFO | faster_whisper | VAD filter removed 01:13.216 of audio
+2026-08-07 12:57:37,254 | INFO | app.application.transcription_service | Transcripción cancelada: input=C:\Users\renzi\Downloads\innoemp3.m4a partial=C:\Users\renzi\Documents\Transcripciones\innoemp3.partial.txt
+2026-08-07 13:11:05,043 | INFO | app.infrastructure.logging_setup | AudiTo 0.2.0 iniciado
