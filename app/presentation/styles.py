@@ -139,8 +139,8 @@ QPushButton:disabled {
 QPushButton#languageToggleButton {
     min-width: 36px;
     max-width: 36px;
-    min-height: 24px;
-    max-height: 24px;
+    min-height: 30px;
+    max-height: 30px;
     padding: 0;
     border-radius: 4px;
     border: 1px solid #343a43;
@@ -217,9 +217,14 @@ QPushButton#recordButton {
     min-height: 27px;
     min-width: 72px;
     background-color: transparent;
-    border-color: #ff4655;
-    color: #ff6572;
+    border-color: #414852;
+    color: #eceef1;
     font-weight: 600;
+}
+QPushButton#recordButton:hover {
+    background-color: #22262d;
+    border-color: #ff4655;
+    color: #ffffff;
 }
 QPushButton#recordButton[recording="true"] {
     background-color: #ff4655;
@@ -298,10 +303,10 @@ QComboBox:disabled, QLineEdit:disabled {
 QComboBox {
     padding-right: 28px;
 }
-QComboBox:hover, QLineEdit:hover {
-    border-color: #646b76;
-}
 QComboBox:focus, QLineEdit:focus {
+    border-color: #454c57;
+}
+QComboBox:hover, QLineEdit:hover {
     border-color: #ff4655;
 }
 QComboBox::drop-down {
@@ -340,3 +345,4 @@ QProgressBar::chunk {
     border-radius: 2px;
 }
 """
+

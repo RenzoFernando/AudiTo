@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 APP_NAME = "AudiTo"
-APP_VERSION = "3.0.2"
+APP_VERSION = "3.0.5"
 SUPPORTED_AUDIO_EXTENSIONS = {
     ".mp3",
     ".m4a",
@@ -30,3 +30,4 @@ LIVE_OVERLAP_SECONDS = 2.5
 LIVE_BUFFER_MAX_SECONDS = 300.0
 WINDOW_WIDTH = 490
 WINDOW_HEIGHT = 570
+
