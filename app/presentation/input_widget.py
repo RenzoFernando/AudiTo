@@ -22,30 +22,25 @@ class AudioInputWidget(QFrame):
         self.setObjectName("audioInput")
         self.setAcceptDrops(True)
         self.setProperty("dragActive", False)
-        self.setFixedHeight(124)
-
+        self.setFixedHeight(116)
         root = QVBoxLayout(self)
-        root.setContentsMargins(16, 12, 16, 12)
-        root.setSpacing(4)
+        root.setContentsMargins(16, 10, 16, 10)
+        root.setSpacing(3)
         root.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
         self.title_label = QLabel("Arrastra un audio aquí")
         self.title_label.setObjectName("dropTitle")
         self.title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.title_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-
         self.helper_label = QLabel("o selecciona un archivo o graba con tu micrófono")
         self.helper_label.setObjectName("inputHelperLabel")
         self.helper_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.helper_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-
         self.formats_label = QLabel("MP3 · M4A · WAV · FLAC · AAC · OGG")
         self.formats_label.setObjectName("mutedLabel")
         self.formats_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.formats_label.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents, True)
-
         actions = QHBoxLayout()
-        actions.setSpacing(6)
+        actions.setSpacing(8)
         actions.addStretch(1)
         self.browse_button = QPushButton("Seleccionar audio")
         self.browse_button.setObjectName("secondaryButton")
@@ -64,13 +59,11 @@ class AudioInputWidget(QFrame):
         actions.addWidget(self.record_button)
         actions.addWidget(self.discard_button)
         actions.addStretch(1)
-
         root.addWidget(self.title_label)
         root.addWidget(self.helper_label)
         root.addWidget(self.formats_label)
         root.addSpacing(2)
         root.addLayout(actions)
-
         self.browse_button.clicked.connect(self.browse_requested.emit)
         self.record_button.clicked.connect(self._record_clicked)
         self.discard_button.clicked.connect(self.discard_record_requested.emit)
@@ -84,14 +77,12 @@ class AudioInputWidget(QFrame):
     def set_recording(self, active: bool) -> None:
         self._recording = active
         self.setAcceptDrops(not active)
-        self.browse_button.setEnabled(not active)
         self.browse_button.setVisible(not active)
         self.discard_button.setVisible(active)
-        self.discard_button.setEnabled(active)
         self.record_button.setText("DETENER" if active else "Grabar")
         self.record_button.setProperty("recording", active)
         if active:
-            self.title_label.setText("Grabando · 00:00")
+            self.title_label.setText("● Grabando · 00:00")
             self.helper_label.setText(f"Micrófono · {self._microphone_name}")
             self.formats_label.setText("WAV · guardado automático")
         else:
@@ -104,14 +95,7 @@ class AudioInputWidget(QFrame):
     def set_recording_time(self, seconds: int) -> None:
         if not self._recording:
             return
-        seconds = max(0, int(seconds))
-        minutes, secs = divmod(seconds, 60)
-        hours, minutes = divmod(minutes, 60)
-        if hours:
-            value = f"{hours:02d}:{minutes:02d}:{secs:02d}"
-        else:
-            value = f"{minutes:02d}:{secs:02d}"
-        self.title_label.setText(f"Grabando · {value}")
+        self.title_label.setText(f"● Grabando · {self._format_time(seconds)}")
 
     def set_microphone_name(self, name: str) -> None:
         cleaned = " ".join(str(name).split()).strip()
@@ -138,6 +122,7 @@ class AudioInputWidget(QFrame):
         self.setAcceptDrops(enabled)
         self.browse_button.setEnabled(enabled)
         self.record_button.setEnabled(enabled)
+        self.discard_button.setEnabled(False)
 
     def _supported_paths(self, event) -> list[str]:
         paths: list[str] = []
@@ -181,3 +166,11 @@ class AudioInputWidget(QFrame):
         self.setProperty("dragActive", active)
         self.style().unpolish(self)
         self.style().polish(self)
+
+    def _format_time(self, seconds: int) -> str:
+        seconds = max(0, int(seconds))
+        minutes, secs = divmod(seconds, 60)
+        hours, minutes = divmod(minutes, 60)
+        if hours:
+            return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+        return f"{minutes:02d}:{secs:02d}"

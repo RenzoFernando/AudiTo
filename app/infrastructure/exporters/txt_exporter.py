@@ -4,6 +4,7 @@ from datetime import datetime
 from pathlib import Path
 
 from app.domain.transcription_job import TranscriptionJob
+from app.domain.transcription_segment import TranscriptionSegment
 
 
 def format_timestamp(seconds: float) -> str:
@@ -24,13 +25,13 @@ class TxtExporter:
         output_dir.mkdir(parents=True, exist_ok=True)
         candidate = output_dir / f"{input_path.stem}.txt"
         counter = 1
-        while candidate.exists() or candidate.with_suffix(".partial.txt").exists():
+        while candidate.exists() or self.partial_path(candidate).exists():
             candidate = output_dir / f"{input_path.stem} ({counter}).txt"
             counter += 1
         return candidate
 
     def partial_path(self, final_path: Path) -> Path:
-        return final_path.with_suffix(".partial.txt")
+        return final_path.with_name(f"{final_path.stem}.partial.txt")
 
     def start(self, job: TranscriptionJob, final_path: Path) -> Path:
         partial = self.partial_path(final_path)
@@ -50,12 +51,27 @@ class TxtExporter:
         partial.write_text("\n".join(lines), encoding="utf-8")
         return partial
 
-    def append_segment(self, partial_path: Path, start_seconds: float, text: str) -> None:
-        cleaned = " ".join(text.strip().split())
+    def append_segment(self, partial_path: Path, segment: TranscriptionSegment) -> None:
+        cleaned = " ".join(segment.text.strip().split())
         if not cleaned:
             return
         with partial_path.open("a", encoding="utf-8") as file:
-            file.write(f"[{format_timestamp(start_seconds)}]\n\n{cleaned}\n\n")
+            file.write(f"[{format_timestamp(segment.start)}]\n\n{cleaned}\n\n")
+
+    def update_duration(self, partial_path: Path, duration: float) -> None:
+        if not partial_path.exists():
+            return
+        lines = partial_path.read_text(encoding="utf-8").splitlines()
+        for index, line in enumerate(lines):
+            if line.startswith("Duración:"):
+                lines[index] = f"Duración: {format_duration(duration)}"
+                break
+        partial_path.write_text("\n".join(lines) + "\n", encoding="utf-8")
 
     def finish(self, partial_path: Path, final_path: Path) -> None:
         partial_path.replace(final_path)
+
+    def discard(self, partial_path: Path, final_path: Path | None = None) -> None:
+        partial_path.unlink(missing_ok=True)
+        if final_path is not None:
+            final_path.unlink(missing_ok=True)

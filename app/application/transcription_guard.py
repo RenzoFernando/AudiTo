@@ -28,7 +28,7 @@ class TranscriptionGuard:
             self._last_normalized = normalized
         return compact
 
-    def finalize_block(self, text: str) -> str:
+    def finalize_segment(self, text: str) -> str:
         compact = " ".join(str(text).strip().split())
         if compact and compact[-1] not in ".!?…":
             compact += "."
@@ -51,16 +51,18 @@ class TranscriptionGuard:
 
     def _repeated_phrase_at(self, words: list[str], index: int) -> tuple[int, int] | None:
         remaining = len(words) - index
-        max_size = min(12, remaining // 3)
-        for size in range(2, max_size + 1):
+        max_size = min(12, remaining // 3 if remaining >= 3 else 1)
+        for size in range(1, max_size + 1):
             phrase = [self._token(word) for word in words[index:index + size]]
+            if not all(phrase):
+                continue
             repeats = 1
             while index + (repeats + 1) * size <= len(words):
                 next_phrase = [self._token(word) for word in words[index + repeats * size:index + (repeats + 1) * size]]
                 if phrase != next_phrase:
                     break
                 repeats += 1
-            minimum_repeats = 4 if size == 2 else 3
+            minimum_repeats = 6 if size == 1 else 4 if size == 2 else 3
             if repeats >= minimum_repeats:
                 return size, repeats
         return None

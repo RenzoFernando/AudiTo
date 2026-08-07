@@ -1,44 +1,41 @@
 from __future__ import annotations
 
-import sys
 from pathlib import Path
+
+from app.infrastructure.system.app_paths import AppPaths
 
 
 def base_dir() -> Path:
-    if getattr(sys, "frozen", False):
-        return Path(sys.executable).resolve().parent
-    return Path(__file__).resolve().parents[2]
+    return AppPaths.resource_dir()
 
 
 def config_dir() -> Path:
-    path = base_dir() / "config"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    return AppPaths.config_dir()
 
 
 def logs_dir() -> Path:
-    path = base_dir() / "logs"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    return AppPaths.logs_dir()
 
 
 def models_dir() -> Path:
-    path = base_dir() / "models"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    return AppPaths.models_dir()
+
+
+def cache_dir() -> Path:
+    return AppPaths.cache_dir()
+
+
+def temp_dir() -> Path:
+    return AppPaths.temp_dir()
 
 
 def ffmpeg_dir() -> Path:
-    path = base_dir() / "ffmpeg"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    return AppPaths.ffmpeg_dir()
 
 
 def assets_dir() -> Path:
-    path = base_dir() / "assets"
-    path.mkdir(parents=True, exist_ok=True)
-    return path
+    return AppPaths.assets_dir()
 
 
 def app_icon_path() -> Path:
-    return assets_dir() / "icon.png"
+    return AppPaths.app_icon_path()

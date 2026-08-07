@@ -17,12 +17,11 @@ class TranscriptionWorker(QThread):
     job_completed = Signal(str, str)
     job_failed = Signal(str, str)
     job_cancelled = Signal(str)
-    queue_progress = Signal(int)
-    queue_finished = Signal()
+    task_finished = Signal()
 
-    def __init__(self, jobs: list[TranscriptionJob], output_dir: Path, parent=None) -> None:
+    def __init__(self, job: TranscriptionJob, output_dir: Path, parent=None) -> None:
         super().__init__(parent)
-        self._jobs = jobs
+        self._job = job
         self._output_dir = output_dir
         self._cancel_event = threading.Event()
         self._service = TranscriptionService()
@@ -31,39 +30,30 @@ class TranscriptionWorker(QThread):
         self._cancel_event.set()
 
     def run(self) -> None:
-        total = len(self._jobs)
-        completed_units = 0
-        for job in self._jobs:
-            self._cancel_event.clear()
-            job.status = JobStatus.PROCESSING
-            job.progress = 0
-            self.job_started.emit(job.id)
-            try:
-                result = self._service.transcribe_job(
-                    job,
-                    self._output_dir,
-                    self._cancel_event,
-                    lambda value, job_id=job.id: self._emit_progress(job_id, value, completed_units, total),
-                    lambda value, job_id=job.id: self.job_status.emit(job_id, value),
-                )
-                job.status = JobStatus.COMPLETED
-                job.progress = 100
-                self.job_completed.emit(job.id, str(result.output_path))
-            except TranscriptionCancelled:
-                job.status = JobStatus.CANCELLED
-                self.job_cancelled.emit(job.id)
-            except Exception as exc:
-                job.status = JobStatus.FAILED
-                job.error = str(exc)
-                self.job_failed.emit(job.id, str(exc))
-            completed_units += 1
-            overall = 100 if total == 0 else int((completed_units / total) * 100)
-            self.queue_progress.emit(overall)
-        self.queue_finished.emit()
+        self._job.status = JobStatus.PROCESSING
+        self._job.progress = 0
+        self.job_started.emit(self._job.id)
+        try:
+            result = self._service.transcribe_job(
+                self._job,
+                self._output_dir,
+                self._cancel_event,
+                self._emit_progress,
+                lambda value: self.job_status.emit(self._job.id, value),
+            )
+            self._job.status = JobStatus.COMPLETED
+            self._job.progress = 100
+            self.job_completed.emit(self._job.id, str(result.output_path))
+        except TranscriptionCancelled:
+            self._job.status = JobStatus.CANCELLED
+            self.job_cancelled.emit(self._job.id)
+        except Exception as exc:
+            self._job.status = JobStatus.FAILED
+            self._job.error = str(exc)
+            self.job_failed.emit(self._job.id, str(exc))
+        self.task_finished.emit()
 
-    def _emit_progress(self, job_id: str, value: int, completed_units: int, total: int) -> None:
+    def _emit_progress(self, value: int) -> None:
         value = max(0, min(100, int(value)))
-        self.job_progress.emit(job_id, value)
-        if total > 0:
-            overall = int(((completed_units + value / 100) / total) * 100)
-            self.queue_progress.emit(max(0, min(100, overall)))
+        self._job.progress = value
+        self.job_progress.emit(self._job.id, value)

@@ -32,7 +32,7 @@ class SettingsWidget(QWidget):
         layout = QGridLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
         layout.setHorizontalSpacing(8)
-        layout.setVerticalSpacing(5)
+        layout.setVerticalSpacing(4)
         language_label = QLabel("Idioma")
         language_label.setObjectName("sectionLabel")
         profile_label = QLabel("Precisión")
@@ -79,8 +79,7 @@ class SettingsWidget(QWidget):
         self.preferences_changed.emit()
 
     def _update_profile_hint(self) -> None:
-        profile = ModelProfile.from_label(self.profile_combo.currentText())
-        self.profile_hint.setText(profile.hint)
+        self.profile_hint.setText(ModelProfile.from_label(self.profile_combo.currentText()).hint)
 
     def _emit_settings_changed(self) -> None:
         self.settings_changed.emit(self.language_combo.currentText(), self.profile_combo.currentText())

@@ -4,11 +4,11 @@ import logging
 from logging.handlers import RotatingFileHandler
 
 from app.constants import APP_NAME, APP_VERSION
-from app.infrastructure.paths import logs_dir
+from app.infrastructure.system.app_paths import AppPaths
 
 
 def configure_logging() -> None:
-    log_path = logs_dir() / "app.log"
+    log_path = AppPaths.logs_dir() / "app.log"
     handler = RotatingFileHandler(log_path, maxBytes=2_000_000, backupCount=3, encoding="utf-8")
     formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
     handler.setFormatter(formatter)

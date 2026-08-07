@@ -22,7 +22,7 @@ def _prepare_environment() -> None:
 def _ensure_dependencies() -> None:
     if getattr(sys, "frozen", False):
         return
-    required = ("PySide6", "faster_whisper", "sounddevice")
+    required = ("PySide6", "faster_whisper", "sounddevice", "huggingface_hub")
     missing = [module for module in required if importlib.util.find_spec(module) is None]
     if not missing:
         return
@@ -46,17 +46,18 @@ def main() -> int:
     from PySide6.QtWidgets import QApplication
     from app.constants import APP_NAME
     from app.infrastructure.logging_setup import configure_logging
-    from app.infrastructure.paths import app_icon_path
+    from app.infrastructure.system.app_paths import AppPaths
     from app.presentation.main_window import MainWindow
 
-    configure_logging()
-    logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     application = QApplication(sys.argv)
     application.setApplicationName(APP_NAME)
     application.setOrganizationName(APP_NAME)
     application.setStyle("Fusion")
-    icon_path = app_icon_path()
+    AppPaths.cleanup_temp()
+    configure_logging()
+    logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
+    icon_path = AppPaths.app_icon_path()
     if icon_path.exists():
         application.setWindowIcon(QIcon(str(icon_path)))
     window = MainWindow()

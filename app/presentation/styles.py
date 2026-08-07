@@ -3,7 +3,7 @@ from __future__ import annotations
 APP_STYLE = """
 QMainWindow, QWidget {
     background-color: #0f1115;
-    color: #f0f1f3;
+    color: #f3f4f6;
     font-family: "Segoe UI";
     font-size: 11px;
 }
@@ -48,7 +48,7 @@ QLabel#fileDot {
     font-size: 9px;
 }
 QLabel#fileDot[state="completed"], QLabel#fileDot[state="recorded"] {
-    color: #ff4655;
+    color: #ff6572;
 }
 QLabel#progressStatusLabel {
     color: #d8dade;
@@ -56,6 +56,10 @@ QLabel#progressStatusLabel {
 }
 QLabel#progressStatusLabel[state="completed"] {
     color: #ff6572;
+    font-weight: 600;
+}
+QLabel#progressStatusLabel[state="recording"] {
+    color: #eceef1;
     font-weight: 600;
 }
 QLabel#etaLabel {
@@ -73,16 +77,16 @@ QLabel#footerLabel {
 }
 QFrame#audioInput {
     background-color: #171a20;
-    border: 1px dashed #4a515d;
+    border: 1px solid #414852;
     border-radius: 6px;
 }
 QFrame#audioInput[dragActive="true"] {
-    background-color: #1b1e25;
-    border: 1px dashed #ff4655;
+    background-color: #1b1f25;
+    border: 1px solid #ff4655;
 }
 QFrame#fileCard {
     background-color: #171a20;
-    border: 1px dashed #454c57;
+    border: 1px solid #414852;
     border-radius: 6px;
 }
 QFrame#progressFrame {
@@ -110,7 +114,7 @@ QPushButton {
     min-height: 30px;
     padding: 0 10px;
     border-radius: 4px;
-    border: 1px dashed #414852;
+    border: 1px solid #414852;
     background-color: #1a1e24;
     color: #eceef1;
     font-size: 10px;
@@ -144,14 +148,21 @@ QPushButton#primaryButton:hover {
     background-color: #f33f4f;
     border-color: #ffffff;
 }
-QPushButton#primaryButton:focus {
-    border-color: #ff7f8a;
+QPushButton#primaryButton:disabled {
+    color: #6f7278;
+    background-color: #2a1a1d;
+    border-color: #3a2428;
 }
 QPushButton#cancelButton {
     min-height: 36px;
     min-width: 102px;
     background-color: transparent;
     color: #d8dade;
+}
+QPushButton#cancelButton:disabled {
+    color: #5f646d;
+    background-color: #14171b;
+    border-color: #292f37;
 }
 QPushButton#secondaryButton {
     min-height: 27px;
@@ -170,6 +181,11 @@ QPushButton#recordButton[recording="true"] {
     background-color: #ff4655;
     border-color: #ff8a94;
     color: #ffffff;
+}
+QPushButton#recordButton:disabled {
+    color: #5f646d;
+    background-color: #14171b;
+    border-color: #292f37;
 }
 QPushButton#discardRecordButton {
     min-height: 27px;
@@ -194,7 +210,7 @@ QPushButton#removeAudioButton {
     padding: 0;
     border-radius: 12px;
     background-color: transparent;
-    border: 1px dashed #454c57;
+    border: 1px solid #454c57;
     color: #8f959e;
     font-size: 14px;
     font-weight: 600;
@@ -216,17 +232,24 @@ QPushButton#openFileButton:hover, QPushButton#openFolderButton:hover {
     border-color: #ff4655;
     color: #ffffff;
 }
-QPushButton#openFileButton:focus, QPushButton#openFolderButton:focus {
-    border-color: #414852;
+QPushButton#openFileButton:disabled, QPushButton#openFolderButton:disabled {
+    color: #5f646d;
+    background-color: #14171b;
+    border-color: #292f37;
 }
 QComboBox, QLineEdit {
     min-height: 30px;
     background-color: #171a20;
-    border: 1px dashed #454c57;
+    border: 1px solid #454c57;
     border-radius: 4px;
     padding: 0 8px;
     color: #eff0f2;
     selection-background-color: #ff4655;
+}
+QComboBox:disabled, QLineEdit:disabled {
+    color: #5f646d;
+    background-color: #14171b;
+    border-color: #292f37;
 }
 QComboBox {
     padding-right: 28px;

@@ -13,10 +13,9 @@ class ProfileDefinition:
 
 
 class ModelProfile(Enum):
-    BASE = ProfileDefinition("Base", "base", 1, "Más ligero · menor precisión")
-    FAST = ProfileDefinition("Rápida", "small", 3, "Rápida · buena para uso diario")
-    BALANCED = ProfileDefinition("Equilibrada", "medium", 5, "Más precisa · mayor consumo")
-    MAXIMUM = ProfileDefinition("Máxima", "large-v3", 5, "Máxima precisión · más lenta")
+    FAST = ProfileDefinition("Rápida", "small", 3, "Menor consumo · más rápida")
+    BALANCED = ProfileDefinition("Equilibrada", "medium", 5, "Balance entre precisión y velocidad")
+    MAXIMUM = ProfileDefinition("Máxima", "large-v3", 5, "Mayor precisión · más consumo")
 
     @property
     def label(self) -> str:

@@ -7,28 +7,24 @@ from pathlib import Path
 
 from PySide6.QtCore import QTimer, Qt, QUrl
 from PySide6.QtGui import QDesktopServices
-from PySide6.QtWidgets import (
-    QFileDialog,
-    QFrame,
-    QHBoxLayout,
-    QLabel,
-    QMainWindow,
-    QMessageBox,
-    QProgressBar,
-    QPushButton,
-    QSizePolicy,
-    QVBoxLayout,
-    QWidget,
-)
+from PySide6.QtWidgets import QFileDialog, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
-from app.application.queue_service import QueueService
-from app.constants import APP_NAME, SUPPORTED_AUDIO_EXTENSIONS, WINDOW_HEIGHT, WINDOW_WIDTH
+from app.application.current_audio_service import CurrentAudioService
+from app.application.live_transcription_service import LiveTranscriptionService
+from app.application.recording_service import AudioRecordingError, RecordingService
+from app.constants import APP_NAME, LANGUAGES, SUPPORTED_AUDIO_EXTENSIONS, WINDOW_HEIGHT, WINDOW_WIDTH
+from app.domain.app_state import AppState
 from app.domain.job_status import JobStatus
-from app.infrastructure.audio.audio_recorder import AudioRecorder, AudioRecordingError
+from app.domain.model_profile import ModelProfile
+from app.domain.transcription_job import TranscriptionJob
+from app.infrastructure.models.model_repository import ModelRepository
 from app.infrastructure.persistence.settings_repository import SettingsRepository
+from app.presentation.current_audio_widget import CurrentAudioWidget
 from app.presentation.input_widget import AudioInputWidget
+from app.presentation.progress_widget import ProgressWidget
 from app.presentation.settings_widget import SettingsWidget
 from app.presentation.styles import APP_STYLE
+from app.workers.live_transcription_worker import LiveTranscriptionWorker
 from app.workers.transcription_worker import TranscriptionWorker
 
 
@@ -38,17 +34,23 @@ class MainWindow(QMainWindow):
         self._logger = logging.getLogger(__name__)
         self._settings_repository = SettingsRepository()
         self._settings = self._settings_repository.load()
-        self._queue_service = QueueService()
-        self._recorder = AudioRecorder()
+        self._model_repository = ModelRepository()
+        self._current_audio = CurrentAudioService()
+        self._recording_service = RecordingService()
+        self._state = AppState.IDLE
         self._worker: TranscriptionWorker | None = None
+        self._live_worker: LiveTranscriptionWorker | None = None
+        self._live_service: LiveTranscriptionService | None = None
         self._current_job_id: str | None = None
         self._transcription_started_at: float | None = None
         self._eta_seconds: float | None = None
         self._recording_started_at: float | None = None
         self._last_output_path: Path | None = None
-        self._last_outcome = "idle"
+        self._recording_previous_job: TranscriptionJob | None = None
         self._recording_previous_output_path: Path | None = None
-        self._recording_previous_outcome = "idle"
+        self._live_failed_message: str | None = None
+        self._discard_restore_pending = False
+        self._recording_error_handled = False
         self._record_timer = QTimer(self)
         self._record_timer.setInterval(250)
         self._record_timer.timeout.connect(self._update_recording_time)
@@ -56,148 +58,86 @@ class MainWindow(QMainWindow):
         self.setFixedSize(WINDOW_WIDTH, WINDOW_HEIGHT)
         self.setStyleSheet(APP_STYLE)
         self._build_ui()
-        self.input_widget.set_microphone_name(self._recorder.default_input_name())
+        self.input_widget.set_microphone_name(self._recording_service.default_input_name())
+        self._apply_state()
 
     def _build_ui(self) -> None:
         shell = QWidget()
         shell_layout = QVBoxLayout(shell)
         shell_layout.setContentsMargins(0, 0, 0, 0)
         shell_layout.setSpacing(0)
-
         content = QWidget()
         root = QVBoxLayout(content)
-        root.setContentsMargins(18, 15, 18, 12)
-        root.setSpacing(10)
-
+        root.setContentsMargins(16, 13, 16, 10)
+        root.setSpacing(8)
         brand_row = QHBoxLayout()
         brand_row.setContentsMargins(0, 0, 0, 2)
-        brand_row.setSpacing(10)
-        left_accents = self._accent_group(mirrored=True)
-        right_accents = self._accent_group(mirrored=False)
+        brand_row.setSpacing(8)
+        brand_row.addWidget(self._accent_group(True))
+        brand_row.addStretch(1)
         brand = QLabel(APP_NAME)
         brand.setObjectName("brandLabel")
         brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        brand_row.addWidget(left_accents)
-        brand_row.addStretch(1)
         brand_row.addWidget(brand, 0, Qt.AlignmentFlag.AlignCenter)
         brand_row.addStretch(1)
-        brand_row.addWidget(right_accents)
+        brand_row.addWidget(self._accent_group(False))
         root.addLayout(brand_row)
-
         self.input_widget = AudioInputWidget()
-        self.input_widget.files_selected.connect(self._add_files)
-        self.input_widget.browse_requested.connect(self._browse_files)
+        self.input_widget.files_selected.connect(self._select_audio)
+        self.input_widget.browse_requested.connect(self._browse_audio)
         self.input_widget.record_requested.connect(self._start_recording)
         self.input_widget.stop_record_requested.connect(self._stop_recording)
         self.input_widget.discard_record_requested.connect(self._discard_recording)
         root.addWidget(self.input_widget)
-
-        self.file_card = QFrame()
-        self.file_card.setObjectName("fileCard")
-        self.file_card.setFixedHeight(56)
-        file_layout = QHBoxLayout(self.file_card)
-        file_layout.setContentsMargins(11, 8, 10, 8)
-        file_layout.setSpacing(8)
-        self.file_dot = QLabel("●")
-        self.file_dot.setObjectName("fileDot")
-        self.file_dot.setProperty("state", "idle")
-        self.file_dot.setFixedWidth(10)
-        file_text = QVBoxLayout()
-        file_text.setContentsMargins(0, 0, 0, 0)
-        file_text.setSpacing(1)
-        self.file_name_label = QLabel("Ningún audio seleccionado")
-        self.file_name_label.setObjectName("fileNameLabel")
-        self.file_name_label.setSizePolicy(QSizePolicy.Policy.Ignored, QSizePolicy.Policy.Preferred)
-        self.file_meta_label = QLabel("Selecciona, arrastra o graba un audio")
-        self.file_meta_label.setObjectName("fileMetaLabel")
-        file_text.addWidget(self.file_name_label)
-        file_text.addWidget(self.file_meta_label)
-        self.remove_audio_button = QPushButton("×")
-        self.remove_audio_button.setObjectName("removeAudioButton")
-        self.remove_audio_button.setToolTip("Quitar audio seleccionado")
-        self.remove_audio_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.remove_audio_button.setEnabled(False)
-        self.remove_audio_button.clicked.connect(self._clear_audio)
-        file_layout.addWidget(self.file_dot)
-        file_layout.addLayout(file_text, 1)
-        file_layout.addWidget(self.remove_audio_button, 0, Qt.AlignmentFlag.AlignVCenter)
-        root.addWidget(self.file_card)
-
+        self.current_audio_widget = CurrentAudioWidget()
+        self.current_audio_widget.remove_requested.connect(self._clear_audio)
+        root.addWidget(self.current_audio_widget)
         self.settings_widget = SettingsWidget(
             self._settings["language"],
             self._settings["profile"],
             self._settings["output_dir"],
         )
-        self.settings_widget.settings_changed.connect(self._update_pending_settings)
-        self.settings_widget.preferences_changed.connect(self._save_settings)
+        self.settings_widget.settings_changed.connect(self._update_selected_settings)
+        self.settings_widget.preferences_changed.connect(self._preferences_changed)
         root.addWidget(self.settings_widget)
-
-        progress_frame = QFrame()
-        progress_frame.setObjectName("progressFrame")
-        progress_layout = QVBoxLayout(progress_frame)
-        progress_layout.setContentsMargins(0, 2, 0, 0)
-        progress_layout.setSpacing(5)
-        progress_header = QHBoxLayout()
-        progress_header.setContentsMargins(0, 0, 0, 0)
-        self.progress_status_label = QLabel("Listo")
-        self.progress_status_label.setObjectName("progressStatusLabel")
-        self.progress_status_label.setProperty("state", "idle")
-        self.eta_label = QLabel("")
-        self.eta_label.setObjectName("etaLabel")
-        self.eta_label.setAlignment(Qt.AlignmentFlag.AlignRight | Qt.AlignmentFlag.AlignVCenter)
-        progress_header.addWidget(self.progress_status_label, 1)
-        progress_header.addWidget(self.eta_label)
-        self.overall_progress = QProgressBar()
-        self.overall_progress.setRange(0, 100)
-        self.overall_progress.setValue(0)
-        progress_layout.addLayout(progress_header)
-        progress_layout.addWidget(self.overall_progress)
-        root.addWidget(progress_frame)
-
+        self.progress_widget = ProgressWidget()
+        root.addWidget(self.progress_widget)
         actions = QHBoxLayout()
-        actions.setSpacing(7)
+        actions.setSpacing(8)
         self.transcribe_button = QPushButton("TRANSCRIBIR")
         self.transcribe_button.setObjectName("primaryButton")
         self.transcribe_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.transcribe_button.setEnabled(False)
         self.transcribe_button.clicked.connect(self._start_transcription)
         self.cancel_button = QPushButton("CANCELAR")
         self.cancel_button.setObjectName("cancelButton")
         self.cancel_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.cancel_button.setEnabled(False)
         self.cancel_button.clicked.connect(self._cancel_current)
         actions.addWidget(self.transcribe_button, 1)
         actions.addWidget(self.cancel_button)
         root.addLayout(actions)
-
         result_layout = QHBoxLayout()
-        result_layout.setSpacing(7)
+        result_layout.setSpacing(8)
         self.open_file_button = QPushButton("ABRIR TRANSCRIPCIÓN")
         self.open_file_button.setObjectName("openFileButton")
         self.open_file_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.open_file_button.setEnabled(False)
         self.open_file_button.clicked.connect(self._open_last_transcription)
         self.open_folder_button = QPushButton("ABRIR CARPETA")
         self.open_folder_button.setObjectName("openFolderButton")
         self.open_folder_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
-        self.open_folder_button.setEnabled(False)
-        self.open_folder_button.clicked.connect(self._open_last_folder)
+        self.open_folder_button.clicked.connect(self._open_output_folder)
         result_layout.addWidget(self.open_file_button, 1)
         result_layout.addWidget(self.open_folder_button, 1)
         root.addLayout(result_layout)
-        root.addStretch(1)
-
         footer = QFrame()
         footer.setObjectName("footerFrame")
-        footer.setFixedHeight(34)
+        footer.setFixedHeight(32)
         footer_layout = QHBoxLayout(footer)
         footer_layout.setContentsMargins(10, 0, 10, 0)
         footer_label = QLabel("Copyright © 2026 · Renzo Fernando Mosquera Daza")
         footer_label.setObjectName("footerLabel")
         footer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         footer_layout.addWidget(footer_label)
-
-        shell_layout.addWidget(content, 1)
+        shell_layout.addWidget(content)
         shell_layout.addWidget(footer)
         self.setCentralWidget(shell)
 
@@ -217,76 +157,54 @@ class MainWindow(QMainWindow):
             layout.addWidget(accent, 0, Qt.AlignmentFlag.AlignVCenter)
         return group
 
-    def _browse_files(self) -> None:
+    def _browse_audio(self) -> None:
+        if not self._is_stable_state():
+            return
         patterns = " ".join(f"*{extension}" for extension in sorted(SUPPORTED_AUDIO_EXTENSIONS))
         path, _ = QFileDialog.getOpenFileName(self, "Seleccionar audio", "", f"Archivos de audio ({patterns});;Todos los archivos (*.*)")
         if path:
-            self._add_files([path])
+            self._select_audio([path])
 
-    def _add_files(self, paths: list[str]) -> None:
-        added, rejected = self._queue_service.add_files(
+    def _select_audio(self, paths: list[str]) -> None:
+        if not self._is_stable_state():
+            return
+        job, rejected, ignored_count = self._current_audio.select(
             paths,
             self.settings_widget.language_combo.currentText(),
             self.settings_widget.profile_combo.currentText(),
         )
-        if added:
-            job = added[0]
-            self._show_job(job.input_path, job.duration)
-            self._set_file_state("selected")
-            self._set_progress_state("idle")
-            self.progress_status_label.setText("Listo para transcribir")
-            self.eta_label.setText("")
-            self.overall_progress.setRange(0, 100)
-            self.overall_progress.setValue(0)
-            self.transcribe_button.setEnabled(True)
-            self.remove_audio_button.setEnabled(True)
-            self._last_output_path = None
-            self._last_outcome = "idle"
-            self._set_result_actions_enabled(False)
-        if rejected and not added:
-            QMessageBox.warning(self, "Archivo no compatible", "El archivo seleccionado no es un audio compatible con AudiTo.")
-
-    def _show_job(self, path: Path, duration: float | None, prefix: str = "") -> None:
-        self.file_name_label.setText(path.name)
-        self.file_name_label.setToolTip(str(path))
-        duration_text = self._file_meta(duration)
-        self.file_meta_label.setText(f"{prefix}{duration_text}" if prefix else duration_text)
+        if job is None:
+            if rejected:
+                QMessageBox.warning(self, "Archivo no compatible", "No se pudo abrir este archivo de audio.")
+            return
+        self._last_output_path = None
+        self.current_audio_widget.show_audio(job.input_path, job.duration)
+        self.progress_widget.set_idle("Listo para transcribir", "")
+        if ignored_count:
+            self.progress_widget.set_idle("Un audio seleccionado", "AudiTo procesa un archivo a la vez")
+        self._set_state(AppState.AUDIO_SELECTED)
 
     def _clear_audio(self) -> None:
-        if self._recorder.is_recording or (self._worker and self._worker.isRunning()):
+        if not self._is_stable_state():
             return
-        self._queue_service.clear()
-        self.file_name_label.setText("Ningún audio seleccionado")
-        self.file_name_label.setToolTip("")
-        self.file_meta_label.setText("Selecciona, arrastra o graba un audio")
-        self._set_file_state("idle")
-        self.progress_status_label.setText("Listo")
-        self.eta_label.setText("")
-        self.overall_progress.setRange(0, 100)
-        self.overall_progress.setValue(0)
-        self.transcribe_button.setEnabled(False)
-        self.remove_audio_button.setEnabled(False)
+        self._current_audio.clear()
         self._last_output_path = None
-        self._last_outcome = "idle"
-        self._set_result_actions_enabled(False)
+        self.current_audio_widget.show_empty()
+        self.progress_widget.set_idle()
+        self._set_state(AppState.IDLE)
 
-    def _file_meta(self, duration: float | None) -> str:
-        if duration is None:
-            return "Duración no disponible"
-        total = max(0, int(duration))
-        hours, remainder = divmod(total, 3600)
-        minutes, seconds = divmod(remainder, 60)
-        if hours:
-            return f"{hours:02d}:{minutes:02d}:{seconds:02d}"
-        return f"{minutes:02d}:{seconds:02d}"
+    def _update_selected_settings(self, language: str, profile: str) -> None:
+        self._current_audio.update_settings(language, profile)
 
-    def _update_pending_settings(self, language: str, profile: str) -> None:
-        self._queue_service.update_pending_settings(language, profile)
+    def _preferences_changed(self) -> None:
+        self._save_settings()
+        self._apply_state()
 
-    def _output_directory(self) -> Path | None:
+    def _output_directory(self, show_errors: bool = True) -> Path | None:
         output_text = self.settings_widget.output_edit.text().strip()
         if not output_text:
-            QMessageBox.warning(self, "Carpeta de salida", "Selecciona una carpeta donde guardar los archivos.")
+            if show_errors:
+                QMessageBox.warning(self, "Carpeta de salida", "Selecciona una carpeta donde guardar los archivos.")
             return None
         output_dir = Path(output_text).expanduser()
         try:
@@ -294,194 +212,216 @@ class MainWindow(QMainWindow):
             test_path = output_dir / ".audito_write_test"
             test_path.write_text("ok", encoding="utf-8")
             test_path.unlink(missing_ok=True)
-        except Exception:
-            QMessageBox.warning(self, "Carpeta de salida", "No se puede escribir en la carpeta seleccionada.")
+            return output_dir
+        except OSError as exc:
+            if show_errors:
+                message = "No hay espacio suficiente para guardar los archivos." if getattr(exc, "errno", None) == 28 else "No se puede escribir en la carpeta seleccionada."
+                QMessageBox.warning(self, "Carpeta de salida", message)
             return None
-        return output_dir
+        except Exception:
+            if show_errors:
+                QMessageBox.warning(self, "Carpeta de salida", "No se puede escribir en la carpeta seleccionada.")
+            return None
 
     def _start_recording(self) -> None:
-        if self._worker and self._worker.isRunning():
+        if not self._is_stable_state():
             return
         output_dir = self._output_directory()
         if output_dir is None:
             return
+        self._recording_previous_job = self._current_audio.job
+        self._recording_previous_output_path = self._last_output_path
+        self._live_failed_message = None
+        self._discard_restore_pending = False
+        self._recording_error_handled = False
         try:
-            path = self._recorder.start(output_dir)
+            session = self._recording_service.start(output_dir)
         except AudioRecordingError as exc:
             QMessageBox.warning(self, "No se pudo grabar", str(exc))
             return
-        self._recording_previous_output_path = self._last_output_path
-        self._recording_previous_outcome = self._last_outcome
+        buffer = self._recording_service.buffer
+        if buffer is None:
+            self._recording_service.discard()
+            QMessageBox.warning(self, "No se pudo grabar", "No se pudo preparar el búfer de audio para la grabación.")
+            return
+        language_label = self.settings_widget.language_combo.currentText()
+        profile_label = self.settings_widget.profile_combo.currentText()
+        live_job = TranscriptionJob(
+            input_path=session.path,
+            language_label=language_label,
+            language_code=LANGUAGES.get(language_label),
+            model_profile=ModelProfile.from_label(profile_label),
+            duration=None,
+        )
+        self._live_service = LiveTranscriptionService(live_job, output_dir, buffer)
+        worker = LiveTranscriptionWorker(self._live_service, self)
+        worker.live_status.connect(self._on_live_status)
+        worker.live_confirmed.connect(self._on_live_confirmed)
+        worker.live_completed.connect(self._on_live_completed)
+        worker.live_failed.connect(self._on_live_failed)
+        worker.live_cancelled.connect(self._on_live_cancelled)
+        worker.finished.connect(lambda worker=worker: self._dispose_live_worker(worker))
+        self._live_worker = worker
         self._last_output_path = None
-        self._set_result_actions_enabled(False)
-        self.file_name_label.setText(path.name)
-        self.file_name_label.setToolTip(str(path))
-        self.file_meta_label.setText("Grabando · guardado automático")
-        self._set_file_state("selected")
+        self.current_audio_widget.show_recording(session.path)
         self.input_widget.set_recording(True)
-        self.settings_widget.set_interactions_enabled(False)
-        self.transcribe_button.setEnabled(False)
-        self.cancel_button.setEnabled(False)
-        self.remove_audio_button.setEnabled(False)
         self._recording_started_at = time.monotonic()
         self.input_widget.set_recording_time(0)
         self._record_timer.start()
-        self.overall_progress.setRange(0, 0)
-        self.progress_status_label.setText("Grabando audio")
-        self.eta_label.setText("Guardado automático")
-        self._set_progress_state("idle")
+        self.progress_widget.set_recording("Preparando transcripción...", "AudiTo empezará cerca de 00:30")
+        self._set_state(AppState.RECORDING)
+        worker.start()
 
     def _stop_recording(self) -> None:
-        if not self._recorder.is_recording:
+        if not self._recording_service.is_recording:
             return
         self._record_timer.stop()
+        session_before = self._recording_service.session
+        elapsed = max(0.0, time.monotonic() - self._recording_started_at) if self._recording_started_at is not None else 0.0
         try:
-            result = self._recorder.stop()
+            session = self._recording_service.stop()
         except AudioRecordingError as exc:
+            self._recording_started_at = None
             self.input_widget.set_recording(False)
-            self.settings_widget.set_interactions_enabled(True)
-            self.overall_progress.setRange(0, 100)
-            self.overall_progress.setValue(0)
-            self.progress_status_label.setText("Grabación incompleta")
-            self.eta_label.setText("")
+            if session_before is not None and session_before.path.exists():
+                job = self._current_audio.set_recording(
+                    session_before.path,
+                    elapsed,
+                    self.settings_widget.language_combo.currentText(),
+                    self.settings_widget.profile_combo.currentText(),
+                )
+                self.current_audio_widget.show_audio(job.input_path, job.duration, "Grabación · ")
+            if self._live_worker and self._live_worker.isRunning():
+                self._live_worker.request_cancel(False)
+            self.progress_widget.set_idle("Grabación detenida", "El audio guardado se conserva")
+            self._recording_service.reset()
+            self._set_state(AppState.ERROR)
             QMessageBox.warning(self, "Error de grabación", str(exc))
             return
         self._recording_started_at = None
         self.input_widget.set_recording(False)
-        self.settings_widget.set_interactions_enabled(True)
-        self._add_files([str(result.path)])
-        jobs = self._queue_service.jobs
-        if jobs:
-            jobs[0].duration = result.duration
-            self._show_job(jobs[0].input_path, result.duration, "Grabación · ")
-        self._set_file_state("recorded")
-        self.progress_status_label.setText("Grabación guardada")
-        self.eta_label.setText(self._file_meta(result.duration))
-        self.overall_progress.setRange(0, 100)
-        self.overall_progress.setValue(0)
-        self.remove_audio_button.setEnabled(True)
+        job = self._current_audio.set_recording(
+            session.path,
+            session.duration,
+            self.settings_widget.language_combo.currentText(),
+            self.settings_widget.profile_combo.currentText(),
+        )
+        self.current_audio_widget.show_audio(job.input_path, job.duration, "Grabación · ")
+        self.current_audio_widget.set_state("recorded")
+        if self._live_failed_message:
+            self.progress_widget.set_idle("Grabación guardada", "Transcripción en vivo detenida · pulsa TRANSCRIBIR")
+            self._recording_service.reset()
+            self._set_state(AppState.ERROR)
+            return
+        if self._live_worker and self._live_worker.isRunning():
+            self.progress_widget.set_indeterminate("Finalizando transcripción...", "Procesando los últimos segundos")
+            self._set_state(AppState.FINALIZING_RECORDING)
+            self._live_worker.request_finalize(session.duration)
+        else:
+            self.progress_widget.set_idle("Grabación guardada", "Pulsa TRANSCRIBIR para generar el TXT")
+            self._recording_service.reset()
+            self._set_state(AppState.AUDIO_SELECTED)
 
     def _discard_recording(self) -> None:
-        if not self._recorder.is_recording:
+        if not self._recording_service.is_recording:
+            return
+        answer = QMessageBox.question(
+            self,
+            "Descartar grabación",
+            "¿Quieres descartar esta grabación? El WAV actual será eliminado.",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
             return
         self._record_timer.stop()
-        self._recorder.cancel()
         self._recording_started_at = None
+        self._discard_restore_pending = True
+        self._recording_service.discard()
         self.input_widget.set_recording(False)
-        self.settings_widget.set_interactions_enabled(True)
-        jobs = self._queue_service.jobs
-        if jobs:
-            job = jobs[0]
-            self._show_job(job.input_path, job.duration)
-            self._set_file_state("selected")
-            self.progress_status_label.setText("Listo para transcribir")
-            self.transcribe_button.setEnabled(True)
-            self.remove_audio_button.setEnabled(True)
+        self.progress_widget.set_indeterminate("Descartando grabación...", "")
+        self._set_state(AppState.FINALIZING_RECORDING)
+        if self._live_worker and self._live_worker.isRunning():
+            self._live_worker.request_cancel(True)
         else:
-            self.file_name_label.setText("Ningún audio seleccionado")
-            self.file_name_label.setToolTip("")
-            self.file_meta_label.setText("Selecciona, arrastra o graba un audio")
-            self._set_file_state("idle")
-            self.progress_status_label.setText("Grabación descartada")
-            self.transcribe_button.setEnabled(False)
-            self.remove_audio_button.setEnabled(False)
-        self._last_output_path = self._recording_previous_output_path
-        self._last_outcome = self._recording_previous_outcome
-        self._set_result_actions_enabled(bool(self._last_output_path and self._last_output_path.exists()))
-        self.eta_label.setText("")
-        self.overall_progress.setRange(0, 100)
-        self.overall_progress.setValue(0)
+            if self._live_service is not None:
+                self._live_service.discard_output()
+            self._restore_after_discard()
 
     def _update_recording_time(self) -> None:
         if self._recording_started_at is None:
             return
         elapsed = int(time.monotonic() - self._recording_started_at)
         self.input_widget.set_recording_time(elapsed)
+        if self._recording_service.writer_error is not None and not self._recording_error_handled:
+            self._recording_error_handled = True
+            QTimer.singleShot(0, self._stop_recording)
 
     def _start_transcription(self) -> None:
-        if self._recorder.is_recording:
+        if not self._is_stable_state():
             return
-        jobs = self._queue_service.pending_jobs()
-        if not jobs and self._queue_service.jobs:
-            job = self._queue_service.jobs[0]
-            if job.status != JobStatus.PROCESSING:
-                job.status = JobStatus.PENDING
-                job.progress = 0
-                job.error = None
-                jobs = [job]
-        if not jobs:
+        job = self._current_audio.job
+        if job is None:
             QMessageBox.information(self, "Sin audio", "Selecciona o graba un audio antes de transcribir.")
             return
         output_dir = self._output_directory()
         if output_dir is None:
             return
-        self._update_pending_settings(
+        self._current_audio.update_settings(
             self.settings_widget.language_combo.currentText(),
             self.settings_widget.profile_combo.currentText(),
         )
-        self._set_processing_state(True)
-        self._last_outcome = "processing"
+        job.status = JobStatus.PENDING
+        job.progress = 0
+        job.error = None
+        self._last_output_path = None
         self._transcription_started_at = None
         self._eta_seconds = None
-        self.overall_progress.setRange(0, 100)
-        self.overall_progress.setValue(0)
-        self.progress_status_label.setText("Preparando audio")
-        self.eta_label.setText("")
-        self._set_progress_state("idle")
-        self._worker = TranscriptionWorker(jobs, output_dir, self)
-        self._worker.job_started.connect(self._on_job_started)
-        self._worker.job_progress.connect(self._on_job_progress)
-        self._worker.job_status.connect(self._on_job_status)
-        self._worker.job_completed.connect(self._on_job_completed)
-        self._worker.job_failed.connect(self._on_job_failed)
-        self._worker.job_cancelled.connect(self._on_job_cancelled)
-        self._worker.queue_finished.connect(self._on_queue_finished)
-        self._worker.start()
+        self.progress_widget.set_file_progress(0, "Tiempo restante: calculando…")
+        self._set_state(AppState.TRANSCRIBING_FILE)
+        worker = TranscriptionWorker(job, output_dir, self)
+        worker.job_started.connect(self._on_job_started)
+        worker.job_progress.connect(self._on_job_progress)
+        worker.job_status.connect(self._on_job_status)
+        worker.job_completed.connect(self._on_job_completed)
+        worker.job_failed.connect(self._on_job_failed)
+        worker.job_cancelled.connect(self._on_job_cancelled)
+        worker.task_finished.connect(self._on_file_task_finished)
+        worker.finished.connect(lambda worker=worker: self._dispose_file_worker(worker))
+        self._worker = worker
+        worker.start()
 
     def _cancel_current(self) -> None:
         if self._worker and self._worker.isRunning() and self._current_job_id:
-            self.progress_status_label.setText("Cancelando…")
-            self.eta_label.setText("")
+            self.progress_widget.set_indeterminate("Cancelando…", "El parcial se conservará")
             self.cancel_button.setEnabled(False)
             self._worker.cancel_current()
 
     def _on_job_started(self, job_id: str) -> None:
         self._current_job_id = job_id
-        self.progress_status_label.setText("Preparando audio")
-        self.cancel_button.setEnabled(True)
+        self.progress_widget.set_indeterminate("Preparando audio", "")
+        self._apply_state()
 
     def _on_job_status(self, job_id: str, status: str) -> None:
         if status == "Descargando modelo por primera vez":
-            self.overall_progress.setRange(0, 0)
-            self.progress_status_label.setText("Descargando modelo")
-            self.eta_label.setText("Solo la primera vez")
+            self.progress_widget.set_indeterminate("Descargando modelo", "Solo la primera vez")
             return
         if status == "Cargando modelo":
-            self.overall_progress.setRange(0, 0)
-            self.progress_status_label.setText("Cargando modelo")
-            self.eta_label.setText("Preparando modelo")
+            self.progress_widget.set_indeterminate("Cargando modelo", "Preparando transcripción")
             return
         if status == "Transcribiendo":
-            self.overall_progress.setRange(0, 100)
-            self.overall_progress.setValue(0)
             self._transcription_started_at = time.monotonic()
             self._eta_seconds = None
-            self.progress_status_label.setText("Transcribiendo · 0 %")
-            self.eta_label.setText("Tiempo restante: calculando…")
+            self.progress_widget.set_file_progress(0, "Tiempo restante: calculando…")
             return
         if status == "Guardando":
-            self.overall_progress.setRange(0, 100)
-            self.progress_status_label.setText("Guardando…")
-            self.eta_label.setText("")
+            self.progress_widget.set_indeterminate("Guardando…", "")
             return
-        self.progress_status_label.setText(status)
+        self.progress_widget.set_indeterminate(status, "")
 
     def _on_job_progress(self, job_id: str, value: int) -> None:
         value = max(0, min(100, int(value)))
-        if self.overall_progress.minimum() == 0 and self.overall_progress.maximum() == 0:
-            self.overall_progress.setRange(0, 100)
-        self.overall_progress.setValue(value)
-        self.progress_status_label.setText(f"Transcribiendo · {value} %")
+        detail = "Tiempo restante: calculando…"
         if value >= 2 and value < 100 and self._transcription_started_at is not None:
             elapsed = max(0.1, time.monotonic() - self._transcription_started_at)
             raw_eta = elapsed * (100 - value) / value
@@ -489,11 +429,178 @@ class MainWindow(QMainWindow):
                 self._eta_seconds = raw_eta
             else:
                 self._eta_seconds = self._eta_seconds * 0.72 + raw_eta * 0.28
-            self.eta_label.setText(f"Tiempo restante: ≈ {self._format_remaining(self._eta_seconds)}")
+            detail = f"Tiempo restante: ≈ {self._format_remaining(self._eta_seconds)}"
         elif value >= 100:
-            self.eta_label.setText("")
+            detail = ""
+        self.progress_widget.set_file_progress(value, detail)
+
+    def _on_job_completed(self, job_id: str, output_path: str) -> None:
+        self._last_output_path = Path(output_path)
+        self.current_audio_widget.set_state("completed")
+        self.progress_widget.set_completed("Completado · 100 %", "Finalizado")
+        self._set_state(AppState.COMPLETED)
+
+    def _on_job_failed(self, job_id: str, message: str) -> None:
+        self.progress_widget.set_idle("No se pudo transcribir", "Parcial conservado")
+        self._set_state(AppState.ERROR)
+        box = QMessageBox(self)
+        box.setIcon(QMessageBox.Icon.Warning)
+        box.setWindowTitle("No se pudo transcribir")
+        box.setText(message)
+        if "Conéctate a internet" in message:
+            box.setStandardButtons(QMessageBox.StandardButton.Retry | QMessageBox.StandardButton.Close)
+            if box.exec() == QMessageBox.StandardButton.Retry:
+                QTimer.singleShot(0, self._start_transcription)
         else:
-            self.eta_label.setText("Tiempo restante: calculando…")
+            box.setStandardButtons(QMessageBox.StandardButton.Close)
+            box.exec()
+
+    def _on_job_cancelled(self, job_id: str) -> None:
+        self.progress_widget.set_idle("Cancelado", "Parcial conservado")
+        self._set_state(AppState.CANCELLED)
+
+    def _on_file_task_finished(self) -> None:
+        self._current_job_id = None
+        self._save_settings()
+        self._apply_state()
+
+    def _on_live_status(self, status: str) -> None:
+        if self._discard_restore_pending:
+            return
+        if self._state == AppState.FINALIZING_RECORDING:
+            if status == "Descargando modelo por primera vez":
+                self.progress_widget.set_indeterminate("Finalizando transcripción...", "Descargando modelo")
+            elif status == "Cargando modelo":
+                self.progress_widget.set_indeterminate("Finalizando transcripción...", "Cargando modelo")
+            return
+        if not self._recording_service.is_recording:
+            return
+        if status == "Descargando modelo por primera vez":
+            self.progress_widget.set_recording("● Grabando", "Descargando modelo de transcripción")
+            return
+        if status == "Cargando modelo":
+            self.progress_widget.set_recording("● Grabando", "Cargando modelo de transcripción")
+            return
+        if status == "Transcribiendo":
+            self.progress_widget.set_recording("Transcribiendo en segundo plano", "Procesando audio reciente...")
+            self._set_state(AppState.RECORDING_TRANSCRIBING)
+            return
+        if status == "GPU no disponible. Usando CPU":
+            self.progress_widget.set_recording("● Grabando", "GPU no disponible · usando CPU")
+
+    def _on_live_confirmed(self, seconds: float) -> None:
+        if self._discard_restore_pending:
+            return
+        detail = f"Texto procesado hasta · {self._format_clock(seconds)}"
+        if self._state == AppState.FINALIZING_RECORDING:
+            self.progress_widget.set_indeterminate("Finalizando transcripción...", detail)
+            return
+        if self._recording_service.is_recording:
+            self.progress_widget.set_recording("Transcribiendo en segundo plano", detail)
+            self._set_state(AppState.RECORDING_TRANSCRIBING)
+
+    def _on_live_completed(self, output_path: str) -> None:
+        if self._discard_restore_pending:
+            return
+        self._last_output_path = Path(output_path)
+        self.current_audio_widget.set_state("completed")
+        self.progress_widget.set_completed("Completado", "TXT listo")
+        self._recording_service.reset()
+        self._live_service = None
+        self._set_state(AppState.COMPLETED)
+        self._save_settings()
+
+    def _on_live_failed(self, message: str) -> None:
+        if self._discard_restore_pending:
+            if self._live_service is not None:
+                self._live_service.discard_output()
+            self._restore_after_discard()
+            return
+        self._live_failed_message = message
+        if self._recording_service.is_recording:
+            self.progress_widget.set_recording("La grabación continúa", "La transcripción en vivo se detuvo por un error")
+            self._set_state(AppState.RECORDING)
+            self._logger.error("Transcripción en vivo detenida: %s", message)
+            return
+        self.progress_widget.set_idle("Grabación guardada", "Puedes transcribir el WAV completo")
+        self._recording_service.reset()
+        self._set_state(AppState.ERROR)
+        QMessageBox.warning(self, "Transcripción en vivo", f"{message}\n\nLa grabación original se conservó.")
+
+    def _on_live_cancelled(self) -> None:
+        if self._discard_restore_pending:
+            self._restore_after_discard()
+
+    def _restore_after_discard(self) -> None:
+        self._discard_restore_pending = False
+        self._live_failed_message = None
+        self._live_service = None
+        self._current_audio.restore(self._recording_previous_job)
+        self._last_output_path = self._recording_previous_output_path
+        job = self._current_audio.job
+        if job is None:
+            self.current_audio_widget.show_empty()
+            self.progress_widget.set_idle("Grabación descartada", "")
+            self._set_state(AppState.IDLE)
+        else:
+            self.current_audio_widget.show_audio(job.input_path, job.duration)
+            if self._last_output_path and self._last_output_path.exists():
+                self.current_audio_widget.set_state("completed")
+                self.progress_widget.set_completed("Grabación descartada", "Resultado anterior disponible")
+                self._set_state(AppState.COMPLETED)
+            else:
+                self.progress_widget.set_idle("Grabación descartada", "Listo para transcribir")
+                self._set_state(AppState.AUDIO_SELECTED)
+        self._recording_previous_job = None
+        self._recording_previous_output_path = None
+        self._save_settings()
+
+    def _set_state(self, state: AppState) -> None:
+        self._state = state
+        self._apply_state()
+
+    def _apply_state(self) -> None:
+        stable = self._is_stable_state()
+        has_audio = self._current_audio.job is not None
+        self.input_widget.set_interactions_enabled(stable)
+        self.settings_widget.set_interactions_enabled(stable)
+        self.transcribe_button.setEnabled(stable and has_audio)
+        self.cancel_button.setEnabled(self._state == AppState.TRANSCRIBING_FILE and self._worker is not None)
+        self.current_audio_widget.set_remove_available(stable and has_audio)
+        self.open_file_button.setEnabled(bool(self._last_output_path and self._last_output_path.exists()))
+        self.open_folder_button.setEnabled(bool(self.settings_widget.output_edit.text().strip()))
+
+    def _is_stable_state(self) -> bool:
+        return self._state in {
+            AppState.IDLE,
+            AppState.AUDIO_SELECTED,
+            AppState.COMPLETED,
+            AppState.CANCELLED,
+            AppState.ERROR,
+        }
+
+    def _open_last_transcription(self) -> None:
+        if self._last_output_path and self._last_output_path.exists():
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._last_output_path)))
+
+    def _open_output_folder(self) -> None:
+        output_dir = self._output_directory()
+        if output_dir is not None:
+            QDesktopServices.openUrl(QUrl.fromLocalFile(str(output_dir)))
+
+    def _save_settings(self) -> None:
+        try:
+            installed = self._model_repository.installed_profiles()
+        except Exception:
+            installed = list(self._settings.get("installed_models", []))
+        self._settings_repository.save(
+            {
+                "language": self.settings_widget.language_combo.currentText(),
+                "profile": self.settings_widget.profile_combo.currentText(),
+                "output_dir": self.settings_widget.output_edit.text(),
+                "installed_models": installed,
+            }
+        )
 
     def _format_remaining(self, seconds: float) -> str:
         seconds = max(0, int(seconds))
@@ -507,99 +614,50 @@ class MainWindow(QMainWindow):
             return f"{hours} h"
         return f"{hours} h {remaining_minutes} min"
 
-    def _on_job_completed(self, job_id: str, output_path: str) -> None:
-        self._last_outcome = "completed"
-        self._last_output_path = Path(output_path)
-        self.overall_progress.setRange(0, 100)
-        self.overall_progress.setValue(100)
-        self.progress_status_label.setText("Completado · 100 %")
-        self.eta_label.setText("Finalizado")
-        self._set_progress_state("completed")
-        self._set_file_state("completed")
-        self.cancel_button.setEnabled(False)
-        self._set_result_actions_enabled(True)
+    def _format_clock(self, seconds: float) -> str:
+        total = max(0, int(seconds))
+        hours, remainder = divmod(total, 3600)
+        minutes, secs = divmod(remainder, 60)
+        if hours:
+            return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+        return f"{minutes:02d}:{secs:02d}"
 
-    def _on_job_failed(self, job_id: str, message: str) -> None:
-        self._last_outcome = "failed"
-        self.overall_progress.setRange(0, 100)
-        self.progress_status_label.setText("No se pudo transcribir")
-        self.eta_label.setText("")
-        self._set_progress_state("idle")
-        self.cancel_button.setEnabled(False)
-        QMessageBox.warning(self, "No se pudo transcribir", message)
-
-    def _on_job_cancelled(self, job_id: str) -> None:
-        self._last_outcome = "cancelled"
-        self.overall_progress.setRange(0, 100)
-        self.progress_status_label.setText("Cancelado")
-        self.eta_label.setText("Parcial conservado")
-        self._set_progress_state("idle")
-        self.cancel_button.setEnabled(False)
-
-    def _on_queue_finished(self) -> None:
-        self._current_job_id = None
-        self._set_processing_state(False)
-        self._save_settings()
-        if self._worker:
-            self._worker.deleteLater()
+    def _dispose_file_worker(self, worker: TranscriptionWorker) -> None:
+        if self._worker is worker:
             self._worker = None
+        worker.deleteLater()
+        self._apply_state()
 
-    def _set_processing_state(self, processing: bool) -> None:
-        self.input_widget.set_interactions_enabled(not processing)
-        self.settings_widget.set_interactions_enabled(not processing)
-        self.transcribe_button.setEnabled(not processing and bool(self._queue_service.jobs))
-        self.cancel_button.setEnabled(processing)
-        self.remove_audio_button.setEnabled(not processing and bool(self._queue_service.jobs))
-
-    def _set_result_actions_enabled(self, enabled: bool) -> None:
-        self.open_file_button.setEnabled(enabled)
-        self.open_folder_button.setEnabled(enabled)
-
-    def _set_file_state(self, state: str) -> None:
-        self.file_dot.setProperty("state", state)
-        self.file_dot.style().unpolish(self.file_dot)
-        self.file_dot.style().polish(self.file_dot)
-
-    def _set_progress_state(self, state: str) -> None:
-        self.progress_status_label.setProperty("state", state)
-        self.progress_status_label.style().unpolish(self.progress_status_label)
-        self.progress_status_label.style().polish(self.progress_status_label)
-
-    def _open_last_transcription(self) -> None:
-        if self._last_output_path and self._last_output_path.exists():
-            QDesktopServices.openUrl(QUrl.fromLocalFile(str(self._last_output_path)))
-
-    def _open_last_folder(self) -> None:
-        if self._last_output_path:
-            folder = self._last_output_path.parent
-            if folder.exists():
-                QDesktopServices.openUrl(QUrl.fromLocalFile(str(folder)))
-
-    def _save_settings(self) -> None:
-        self._settings_repository.save(
-            {
-                "language": self.settings_widget.language_combo.currentText(),
-                "profile": self.settings_widget.profile_combo.currentText(),
-                "output_dir": self.settings_widget.output_edit.text(),
-            }
-        )
+    def _dispose_live_worker(self, worker: LiveTranscriptionWorker) -> None:
+        if self._live_worker is worker:
+            self._live_worker = None
+        worker.deleteLater()
 
     def closeEvent(self, event) -> None:
-        if self._recorder.is_recording:
-            self._record_timer.stop()
-            self._recorder.cancel()
-        if self._worker and self._worker.isRunning():
+        active = self._recording_service.is_recording or (self._worker and self._worker.isRunning()) or (self._live_worker and self._live_worker.isRunning())
+        if active:
+            message = "Hay una grabación en curso. AudiTo la detendrá y conservará el audio antes de cerrar." if self._recording_service.is_recording else "Hay un proceso en curso. El TXT parcial se conservará si cierras ahora."
             answer = QMessageBox.question(
                 self,
-                "Transcripción en curso",
-                "Hay una transcripción en curso. ¿Quieres cerrar AudiTo? El archivo actual se cancelará.",
+                "Cerrar AudiTo",
+                f"{message}\n\n¿Quieres cerrar AudiTo?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )
             if answer != QMessageBox.StandardButton.Yes:
                 event.ignore()
                 return
+        self._record_timer.stop()
+        if self._recording_service.is_recording:
+            try:
+                self._recording_service.stop()
+            except Exception:
+                self._logger.exception("No se pudo cerrar la grabación limpiamente")
+        if self._worker and self._worker.isRunning():
             self._worker.cancel_current()
             self._worker.wait(5000)
+        if self._live_worker and self._live_worker.isRunning():
+            self._live_worker.request_cancel(False)
+            self._live_worker.wait(5000)
         self._save_settings()
         event.accept()
