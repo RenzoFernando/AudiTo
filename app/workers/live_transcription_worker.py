@@ -11,6 +11,7 @@ from app.application.live_transcription_service import LiveTranscriptionService
 class LiveTranscriptionWorker(QThread):
     live_status = Signal(str)
     live_confirmed = Signal(float)
+    live_metrics = Signal(float, float)
     live_completed = Signal(str)
     live_failed = Signal(str)
     live_cancelled = Signal()
@@ -40,8 +41,12 @@ class LiveTranscriptionWorker(QThread):
                     self.live_cancelled.emit()
                     return
                 force = self._finalize_event.is_set()
+                started_at = time.monotonic()
                 result = self._service.process_available(force, self.live_status.emit)
+                processing_seconds = max(0.0, time.monotonic() - started_at)
                 if result is not None:
+                    audio_seconds = max(0.2, result.end_seconds - result.start_seconds)
+                    self.live_metrics.emit(audio_seconds, processing_seconds)
                     self.live_confirmed.emit(result.end_seconds)
                 if force:
                     if self._cancel_event.is_set():

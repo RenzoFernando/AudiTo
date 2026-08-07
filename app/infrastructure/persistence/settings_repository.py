@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from app.constants import CONFIG_VERSION, DEFAULT_LANGUAGE, DEFAULT_PROFILE
+from app.constants import CONFIG_VERSION, DEFAULT_LANGUAGE, DEFAULT_PROFILE, DEFAULT_UI_LANGUAGE
 from app.infrastructure.system.app_paths import AppPaths
 
 
@@ -14,6 +14,7 @@ class SettingsRepository:
     def load(self) -> dict:
         defaults = {
             "config_version": CONFIG_VERSION,
+            "ui_language": DEFAULT_UI_LANGUAGE,
             "language": DEFAULT_LANGUAGE,
             "profile": DEFAULT_PROFILE,
             "output_dir": str(Path.home() / "Documents" / "Transcripciones"),
@@ -27,11 +28,14 @@ class SettingsRepository:
         except Exception:
             pass
         defaults["config_version"] = CONFIG_VERSION
+        if defaults["ui_language"] not in {"es", "en"}:
+            defaults["ui_language"] = DEFAULT_UI_LANGUAGE
         return defaults
 
     def save(self, settings: dict) -> None:
         payload = {
             "config_version": CONFIG_VERSION,
+            "ui_language": settings.get("ui_language", DEFAULT_UI_LANGUAGE),
             "language": settings.get("language", DEFAULT_LANGUAGE),
             "profile": settings.get("profile", DEFAULT_PROFILE),
             "output_dir": settings.get("output_dir", str(Path.home() / "Documents" / "Transcripciones")),

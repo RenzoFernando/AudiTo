@@ -136,6 +136,50 @@ QPushButton:disabled {
     background-color: #14171b;
     border-color: #292f37;
 }
+QPushButton#languageToggleButton {
+    min-width: 36px;
+    max-width: 36px;
+    min-height: 24px;
+    max-height: 24px;
+    padding: 0;
+    border-radius: 4px;
+    border: 1px solid #343a43;
+    background-color: #15191e;
+    color: #b8bdc5;
+    font-size: 8px;
+    font-weight: 700;
+}
+QPushButton#languageToggleButton:hover {
+    border-color: #ff4655;
+    color: #ffffff;
+}
+QPushButton#languageToggleButton:disabled {
+    color: #5f646d;
+    background-color: #14171b;
+    border-color: #292f37;
+}
+QPushButton#footerLinkButton {
+    min-height: 18px;
+    max-height: 18px;
+    min-width: 0;
+    padding: 0 2px;
+    border: none;
+    border-radius: 0;
+    background-color: transparent;
+    color: #ff6572;
+    font-size: 8px;
+    font-weight: 600;
+}
+QPushButton#footerLinkButton:hover {
+    background-color: transparent;
+    border: none;
+    color: #ffffff;
+}
+QPushButton#footerLinkButton:pressed {
+    background-color: transparent;
+    border: none;
+    color: #ff4655;
+}
 QPushButton#primaryButton {
     min-height: 36px;
     background-color: #ff4655;
