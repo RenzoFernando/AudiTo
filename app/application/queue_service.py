@@ -42,6 +42,9 @@ class QueueService:
         self._jobs = [job]
         return [job], rejected
 
+    def clear(self) -> None:
+        self._jobs.clear()
+
     def update_pending_settings(self, language_label: str, profile_label: str) -> None:
         profile = ModelProfile.from_label(profile_label)
         language_code = LANGUAGES.get(language_label)

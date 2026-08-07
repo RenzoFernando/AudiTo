@@ -80,3 +80,19 @@
 2026-08-07 14:06:53,350 | INFO | faster_whisper | Processing audio with duration 01:29:54.880
 2026-08-07 14:07:06,294 | INFO | faster_whisper | VAD filter removed 01:13.216 of audio
 2026-08-07 15:52:39,600 | INFO | app.application.transcription_service | Transcripción completada: input=C:\Users\renzi\Downloads\innoemp3.m4a output=C:\Users\renzi\Documents\Transcripciones\innoemp3 (3).txt segments=2451
+2026-08-07 16:03:14,760 | INFO | app.infrastructure.logging_setup | AudiTo 0.4.1 iniciado
+2026-08-07 16:08:54,863 | INFO | app.infrastructure.audio.audio_recorder | Grabación iniciada: path=C:\Users\renzi\Documents\Transcripciones\Grabaciones\Grabacion_2026-08-07_16-08-54.wav samplerate=44100
+2026-08-07 16:09:09,717 | INFO | app.infrastructure.audio.audio_recorder | Grabación finalizada: path=C:\Users\renzi\Documents\Transcripciones\Grabaciones\Grabacion_2026-08-07_16-08-54.wav duration=14.86
+2026-08-07 16:23:51,827 | INFO | app.infrastructure.logging_setup | AudiTo 0.5.0 iniciado
+2026-08-07 16:24:12,790 | INFO | app.infrastructure.logging_setup | AudiTo 0.5.0 iniciado
+2026-08-07 16:24:23,636 | INFO | app.infrastructure.audio.audio_recorder | Grabación iniciada: path=C:\Users\renzi\Documents\Transcripciones\Grabaciones\Grabacion_2026-08-07_16-24-23.wav samplerate=44100
+2026-08-07 16:24:45,764 | INFO | app.infrastructure.audio.audio_recorder | Grabación finalizada: path=C:\Users\renzi\Documents\Transcripciones\Grabaciones\Grabacion_2026-08-07_16-24-23.wav duration=22.13
+2026-08-07 16:24:54,131 | INFO | httpx | HTTP Request: GET https://huggingface.co/api/models/Systran/faster-whisper-medium/revision/main "HTTP/1.1 200 OK"
+2026-08-07 16:25:02,917 | INFO | app.infrastructure.whisper.faster_whisper_engine | Modelo cargado: profile=Equilibrada model=medium device=cpu
+2026-08-07 16:25:03,110 | INFO | faster_whisper | Processing audio with duration 00:21.947
+2026-08-07 16:25:03,584 | INFO | faster_whisper | VAD filter removed 00:02.171 of audio
+2026-08-07 16:25:13,005 | INFO | app.application.transcription_service | Transcripción completada: input=C:\Users\renzi\Documents\Transcripciones\Grabaciones\Grabacion_2026-08-07_16-24-23.wav output=C:\Users\renzi\Documents\Transcripciones\Grabacion_2026-08-07_16-24-23.txt segments=3 filtered=0
+2026-08-07 16:28:30,191 | INFO | app.infrastructure.logging_setup | AudiTo 0.5.0 iniciado
+2026-08-07 17:02:04,868 | INFO | app.infrastructure.logging_setup | AudiTo 0.5.0 iniciado
+2026-08-07 17:02:17,463 | INFO | app.infrastructure.logging_setup | AudiTo 0.5.0 iniciado
+2026-08-07 17:02:21,150 | INFO | app.infrastructure.logging_setup | AudiTo 0.5.0 iniciado

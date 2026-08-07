@@ -47,6 +47,8 @@ class MainWindow(QMainWindow):
         self._recording_started_at: float | None = None
         self._last_output_path: Path | None = None
         self._last_outcome = "idle"
+        self._recording_previous_output_path: Path | None = None
+        self._recording_previous_outcome = "idle"
         self._record_timer = QTimer(self)
         self._record_timer.setInterval(250)
         self._record_timer.timeout.connect(self._update_recording_time)
@@ -57,21 +59,24 @@ class MainWindow(QMainWindow):
         self.input_widget.set_microphone_name(self._recorder.default_input_name())
 
     def _build_ui(self) -> None:
-        container = QWidget()
-        root = QVBoxLayout(container)
-        root.setContentsMargins(18, 15, 18, 14)
+        shell = QWidget()
+        shell_layout = QVBoxLayout(shell)
+        shell_layout.setContentsMargins(0, 0, 0, 0)
+        shell_layout.setSpacing(0)
+
+        content = QWidget()
+        root = QVBoxLayout(content)
+        root.setContentsMargins(18, 15, 18, 12)
         root.setSpacing(10)
 
         brand_row = QHBoxLayout()
         brand_row.setContentsMargins(0, 0, 0, 2)
         brand_row.setSpacing(10)
-
         left_accents = self._accent_group(mirrored=True)
         right_accents = self._accent_group(mirrored=False)
         brand = QLabel(APP_NAME)
         brand.setObjectName("brandLabel")
         brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
-
         brand_row.addWidget(left_accents)
         brand_row.addStretch(1)
         brand_row.addWidget(brand, 0, Qt.AlignmentFlag.AlignCenter)
@@ -84,13 +89,14 @@ class MainWindow(QMainWindow):
         self.input_widget.browse_requested.connect(self._browse_files)
         self.input_widget.record_requested.connect(self._start_recording)
         self.input_widget.stop_record_requested.connect(self._stop_recording)
+        self.input_widget.discard_record_requested.connect(self._discard_recording)
         root.addWidget(self.input_widget)
 
         self.file_card = QFrame()
         self.file_card.setObjectName("fileCard")
         self.file_card.setFixedHeight(56)
         file_layout = QHBoxLayout(self.file_card)
-        file_layout.setContentsMargins(11, 8, 11, 8)
+        file_layout.setContentsMargins(11, 8, 10, 8)
         file_layout.setSpacing(8)
         self.file_dot = QLabel("●")
         self.file_dot.setObjectName("fileDot")
@@ -106,8 +112,15 @@ class MainWindow(QMainWindow):
         self.file_meta_label.setObjectName("fileMetaLabel")
         file_text.addWidget(self.file_name_label)
         file_text.addWidget(self.file_meta_label)
+        self.remove_audio_button = QPushButton("×")
+        self.remove_audio_button.setObjectName("removeAudioButton")
+        self.remove_audio_button.setToolTip("Quitar audio seleccionado")
+        self.remove_audio_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.remove_audio_button.setEnabled(False)
+        self.remove_audio_button.clicked.connect(self._clear_audio)
         file_layout.addWidget(self.file_dot)
         file_layout.addLayout(file_text, 1)
+        file_layout.addWidget(self.remove_audio_button, 0, Qt.AlignmentFlag.AlignVCenter)
         root.addWidget(self.file_card)
 
         self.settings_widget = SettingsWidget(
@@ -145,10 +158,12 @@ class MainWindow(QMainWindow):
         actions.setSpacing(7)
         self.transcribe_button = QPushButton("TRANSCRIBIR")
         self.transcribe_button.setObjectName("primaryButton")
+        self.transcribe_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.transcribe_button.setEnabled(False)
         self.transcribe_button.clicked.connect(self._start_transcription)
         self.cancel_button = QPushButton("CANCELAR")
         self.cancel_button.setObjectName("cancelButton")
+        self.cancel_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.cancel_button.setEnabled(False)
         self.cancel_button.clicked.connect(self._cancel_current)
         actions.addWidget(self.transcribe_button, 1)
@@ -159,27 +174,32 @@ class MainWindow(QMainWindow):
         result_layout.setSpacing(7)
         self.open_file_button = QPushButton("ABRIR TRANSCRIPCIÓN")
         self.open_file_button.setObjectName("openFileButton")
+        self.open_file_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.open_file_button.setEnabled(False)
         self.open_file_button.clicked.connect(self._open_last_transcription)
         self.open_folder_button = QPushButton("ABRIR CARPETA")
         self.open_folder_button.setObjectName("openFolderButton")
+        self.open_folder_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.open_folder_button.setEnabled(False)
         self.open_folder_button.clicked.connect(self._open_last_folder)
         result_layout.addWidget(self.open_file_button, 1)
         result_layout.addWidget(self.open_folder_button, 1)
         root.addLayout(result_layout)
+        root.addStretch(1)
 
-        footer_divider = QFrame()
-        footer_divider.setObjectName("footerDivider")
-        footer_divider.setFixedHeight(8)
-        root.addWidget(footer_divider)
+        footer = QFrame()
+        footer.setObjectName("footerFrame")
+        footer.setFixedHeight(34)
+        footer_layout = QHBoxLayout(footer)
+        footer_layout.setContentsMargins(10, 0, 10, 0)
+        footer_label = QLabel("Copyright © 2026 · Renzo Fernando Mosquera Daza")
+        footer_label.setObjectName("footerLabel")
+        footer_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        footer_layout.addWidget(footer_label)
 
-        footer = QLabel("Copyright © 2026 · Renzo Fernando Mosquera Daza")
-        footer.setObjectName("footerLabel")
-        footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        root.addWidget(footer)
-
-        self.setCentralWidget(container)
+        shell_layout.addWidget(content, 1)
+        shell_layout.addWidget(footer)
+        self.setCentralWidget(shell)
 
     def _accent_group(self, mirrored: bool) -> QWidget:
         group = QWidget()
@@ -211,9 +231,7 @@ class MainWindow(QMainWindow):
         )
         if added:
             job = added[0]
-            self.file_name_label.setText(job.input_path.name)
-            self.file_name_label.setToolTip(str(job.input_path))
-            self.file_meta_label.setText(self._file_meta(job.duration))
+            self._show_job(job.input_path, job.duration)
             self._set_file_state("selected")
             self._set_progress_state("idle")
             self.progress_status_label.setText("Listo para transcribir")
@@ -221,11 +239,36 @@ class MainWindow(QMainWindow):
             self.overall_progress.setRange(0, 100)
             self.overall_progress.setValue(0)
             self.transcribe_button.setEnabled(True)
+            self.remove_audio_button.setEnabled(True)
             self._last_output_path = None
             self._last_outcome = "idle"
             self._set_result_actions_enabled(False)
         if rejected and not added:
             QMessageBox.warning(self, "Archivo no compatible", "El archivo seleccionado no es un audio compatible con AudiTo.")
+
+    def _show_job(self, path: Path, duration: float | None, prefix: str = "") -> None:
+        self.file_name_label.setText(path.name)
+        self.file_name_label.setToolTip(str(path))
+        duration_text = self._file_meta(duration)
+        self.file_meta_label.setText(f"{prefix}{duration_text}" if prefix else duration_text)
+
+    def _clear_audio(self) -> None:
+        if self._recorder.is_recording or (self._worker and self._worker.isRunning()):
+            return
+        self._queue_service.clear()
+        self.file_name_label.setText("Ningún audio seleccionado")
+        self.file_name_label.setToolTip("")
+        self.file_meta_label.setText("Selecciona, arrastra o graba un audio")
+        self._set_file_state("idle")
+        self.progress_status_label.setText("Listo")
+        self.eta_label.setText("")
+        self.overall_progress.setRange(0, 100)
+        self.overall_progress.setValue(0)
+        self.transcribe_button.setEnabled(False)
+        self.remove_audio_button.setEnabled(False)
+        self._last_output_path = None
+        self._last_outcome = "idle"
+        self._set_result_actions_enabled(False)
 
     def _file_meta(self, duration: float | None) -> str:
         if duration is None:
@@ -267,6 +310,8 @@ class MainWindow(QMainWindow):
         except AudioRecordingError as exc:
             QMessageBox.warning(self, "No se pudo grabar", str(exc))
             return
+        self._recording_previous_output_path = self._last_output_path
+        self._recording_previous_outcome = self._last_outcome
         self._last_output_path = None
         self._set_result_actions_enabled(False)
         self.file_name_label.setText(path.name)
@@ -277,6 +322,7 @@ class MainWindow(QMainWindow):
         self.settings_widget.set_interactions_enabled(False)
         self.transcribe_button.setEnabled(False)
         self.cancel_button.setEnabled(False)
+        self.remove_audio_button.setEnabled(False)
         self._recording_started_at = time.monotonic()
         self.input_widget.set_recording_time(0)
         self._record_timer.start()
@@ -307,10 +353,42 @@ class MainWindow(QMainWindow):
         jobs = self._queue_service.jobs
         if jobs:
             jobs[0].duration = result.duration
-            self.file_meta_label.setText(f"Grabación · {self._file_meta(result.duration)}")
+            self._show_job(jobs[0].input_path, result.duration, "Grabación · ")
         self._set_file_state("recorded")
         self.progress_status_label.setText("Grabación guardada")
         self.eta_label.setText(self._file_meta(result.duration))
+        self.overall_progress.setRange(0, 100)
+        self.overall_progress.setValue(0)
+        self.remove_audio_button.setEnabled(True)
+
+    def _discard_recording(self) -> None:
+        if not self._recorder.is_recording:
+            return
+        self._record_timer.stop()
+        self._recorder.cancel()
+        self._recording_started_at = None
+        self.input_widget.set_recording(False)
+        self.settings_widget.set_interactions_enabled(True)
+        jobs = self._queue_service.jobs
+        if jobs:
+            job = jobs[0]
+            self._show_job(job.input_path, job.duration)
+            self._set_file_state("selected")
+            self.progress_status_label.setText("Listo para transcribir")
+            self.transcribe_button.setEnabled(True)
+            self.remove_audio_button.setEnabled(True)
+        else:
+            self.file_name_label.setText("Ningún audio seleccionado")
+            self.file_name_label.setToolTip("")
+            self.file_meta_label.setText("Selecciona, arrastra o graba un audio")
+            self._set_file_state("idle")
+            self.progress_status_label.setText("Grabación descartada")
+            self.transcribe_button.setEnabled(False)
+            self.remove_audio_button.setEnabled(False)
+        self._last_output_path = self._recording_previous_output_path
+        self._last_outcome = self._recording_previous_outcome
+        self._set_result_actions_enabled(bool(self._last_output_path and self._last_output_path.exists()))
+        self.eta_label.setText("")
         self.overall_progress.setRange(0, 100)
         self.overall_progress.setValue(0)
 
@@ -471,6 +549,7 @@ class MainWindow(QMainWindow):
         self.settings_widget.set_interactions_enabled(not processing)
         self.transcribe_button.setEnabled(not processing and bool(self._queue_service.jobs))
         self.cancel_button.setEnabled(processing)
+        self.remove_audio_button.setEnabled(not processing and bool(self._queue_service.jobs))
 
     def _set_result_actions_enabled(self, enabled: bool) -> None:
         self.open_file_button.setEnabled(enabled)
@@ -508,10 +587,7 @@ class MainWindow(QMainWindow):
     def closeEvent(self, event) -> None:
         if self._recorder.is_recording:
             self._record_timer.stop()
-            try:
-                self._recorder.stop()
-            except AudioRecordingError:
-                pass
+            self._recorder.cancel()
         if self._worker and self._worker.isRunning():
             answer = QMessageBox.question(
                 self,

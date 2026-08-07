@@ -93,8 +93,14 @@ class FasterWhisperEngine:
                 language=language_code,
                 beam_size=profile.beam_size,
                 vad_filter=True,
-                condition_on_previous_text=True,
-                temperature=0.0,
+                vad_parameters={"min_silence_duration_ms": 300},
+                condition_on_previous_text=False,
+                temperature=[0.0, 0.2, 0.4, 0.6],
+                compression_ratio_threshold=2.4,
+                log_prob_threshold=-1.0,
+                no_speech_threshold=0.6,
+                repetition_penalty=1.05,
+                no_repeat_ngram_size=5,
                 word_timestamps=False,
             )
             return self._safe_segments(segments), getattr(info, "language", None)

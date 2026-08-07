@@ -13,6 +13,7 @@ class AudioInputWidget(QFrame):
     browse_requested = Signal()
     record_requested = Signal()
     stop_record_requested = Signal()
+    discard_record_requested = Signal()
 
     def __init__(self, parent=None) -> None:
         super().__init__(parent)
@@ -49,11 +50,19 @@ class AudioInputWidget(QFrame):
         self.browse_button = QPushButton("Seleccionar audio")
         self.browse_button.setObjectName("secondaryButton")
         self.browse_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.browse_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.record_button = QPushButton("Grabar")
         self.record_button.setObjectName("recordButton")
         self.record_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.record_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.discard_button = QPushButton("Descartar")
+        self.discard_button.setObjectName("discardRecordButton")
+        self.discard_button.setCursor(Qt.CursorShape.PointingHandCursor)
+        self.discard_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.discard_button.setVisible(False)
         actions.addWidget(self.browse_button)
         actions.addWidget(self.record_button)
+        actions.addWidget(self.discard_button)
         actions.addStretch(1)
 
         root.addWidget(self.title_label)
@@ -64,6 +73,7 @@ class AudioInputWidget(QFrame):
 
         self.browse_button.clicked.connect(self.browse_requested.emit)
         self.record_button.clicked.connect(self._record_clicked)
+        self.discard_button.clicked.connect(self.discard_record_requested.emit)
 
     def _record_clicked(self) -> None:
         if self._recording:
@@ -75,6 +85,9 @@ class AudioInputWidget(QFrame):
         self._recording = active
         self.setAcceptDrops(not active)
         self.browse_button.setEnabled(not active)
+        self.browse_button.setVisible(not active)
+        self.discard_button.setVisible(active)
+        self.discard_button.setEnabled(active)
         self.record_button.setText("DETENER" if active else "Grabar")
         self.record_button.setProperty("recording", active)
         if active:
@@ -120,6 +133,7 @@ class AudioInputWidget(QFrame):
             self.setAcceptDrops(False)
             self.browse_button.setEnabled(False)
             self.record_button.setEnabled(True)
+            self.discard_button.setEnabled(True)
             return
         self.setAcceptDrops(enabled)
         self.browse_button.setEnabled(enabled)

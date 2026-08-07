@@ -5,6 +5,7 @@ import threading
 from collections.abc import Callable
 from pathlib import Path
 
+from app.application.transcription_guard import TranscriptionGuard
 from app.constants import TIMESTAMP_BLOCK_SECONDS
 from app.domain.transcription_job import TranscriptionJob
 from app.domain.transcription_result import TranscriptionResult
@@ -34,7 +35,9 @@ class TranscriptionService:
         job.output_path = final_path
         status_callback("Preparando audio")
         partial_path = self._exporter.start(job, final_path)
+        guard = TranscriptionGuard()
         segment_count = 0
+        filtered_count = 0
         detected_language = None
         chunk_start: float | None = None
         chunk_end: float | None = None
@@ -44,7 +47,9 @@ class TranscriptionService:
             nonlocal chunk_start, chunk_end, chunk_text
             if chunk_start is None or not chunk_text:
                 return
-            self._exporter.append_segment(partial_path, chunk_start, " ".join(chunk_text))
+            block = guard.finalize_block(" ".join(chunk_text))
+            if block:
+                self._exporter.append_segment(partial_path, chunk_start, block)
             chunk_start = None
             chunk_end = None
             chunk_text = []
@@ -62,8 +67,15 @@ class TranscriptionService:
                     raise TranscriptionCancelled("Transcripción cancelada")
                 start = float(segment.start)
                 end = float(segment.end)
-                text = str(segment.text).strip()
-                if text:
+                original_text = str(segment.text).strip()
+                text = guard.clean_segment(original_text)
+                if original_text and not text:
+                    filtered_count += 1
+                    self._logger.warning("Segmento repetitivo descartado: input=%s start=%.2f end=%.2f", job.input_path, start, end)
+                elif text:
+                    if text != " ".join(original_text.split()):
+                        filtered_count += 1
+                        self._logger.warning("Repetición interna reducida: input=%s start=%.2f end=%.2f", job.input_path, start, end)
                     if chunk_start is None:
                         chunk_start = start
                     chunk_end = end
@@ -80,7 +92,13 @@ class TranscriptionService:
             status_callback("Guardando")
             self._exporter.finish(partial_path, final_path)
             progress_callback(100)
-            self._logger.info("Transcripción completada: input=%s output=%s segments=%s", job.input_path, final_path, segment_count)
+            self._logger.info(
+                "Transcripción completada: input=%s output=%s segments=%s filtered=%s",
+                job.input_path,
+                final_path,
+                segment_count,
+                filtered_count,
+            )
             return TranscriptionResult(final_path, job.duration, detected_language, segment_count)
         except TranscriptionCancelled:
             flush_chunk()

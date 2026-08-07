@@ -1,0 +1,72 @@
+<!doctype html>
+<html lang="es">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="description" content="AudiTo transforma audio en texto localmente con perfiles de precisión y marcas de tiempo.">
+    <title>AudiTo · Audio a texto local</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <header class="topbar">
+        <div class="accent accent-left"><span></span><span></span><span></span></div>
+        <a class="brand" href="#inicio">AudiTo</a>
+        <div class="accent"><span></span><span></span><span></span></div>
+    </header>
+
+    <main>
+        <section class="hero" id="inicio">
+            <p class="eyebrow">TRANSCRIPCIÓN LOCAL</p>
+            <h1>De audio a texto, sin complicarlo.</h1>
+            <p class="lead">Carga un archivo o graba desde tu micrófono, elige un perfil y deja que AudiTo genere un TXT con marcas de tiempo. El procesamiento se realiza en tu equipo.</p>
+            <div class="hero-actions">
+                <a class="button primary" href="#como-funciona">Cómo funciona</a>
+                <a class="button" href="#benchmark">Ver benchmark</a>
+            </div>
+        </section>
+
+        <section class="section" id="como-funciona">
+            <div class="section-heading">
+                <p class="eyebrow">FLUJO</p>
+                <h2>Tres pasos.</h2>
+            </div>
+            <div class="steps">
+                <article class="card"><span>01</span><h3>Audio</h3><p>Arrastra, selecciona o graba directamente con el micrófono.</p></article>
+                <article class="card"><span>02</span><h3>Perfil</h3><p>Elige Base, Rápida, Equilibrada o Máxima según tiempo y precisión.</p></article>
+                <article class="card"><span>03</span><h3>TXT</h3><p>Obtén una transcripción local con bloques temporales y acceso directo al resultado.</p></article>
+            </div>
+        </section>
+
+        <section class="section" id="benchmark">
+            <div class="section-heading split">
+                <div><p class="eyebrow">BENCHMARK ACTUAL</p><h2>Resultados del audio de prueba.</h2></div>
+                <p class="note">Las cifras son estimaciones de comprensión sobre una clase de 01:29:54. No sustituyen una medición WER contra una transcripción humana de referencia.</p>
+            </div>
+            <div id="measured-results" class="benchmark-grid"></div>
+            <div class="benchmark-meta">
+                <div><strong>~60 min</strong><span>Microsoft</span></div>
+                <div><strong>~100 min</strong><span>AudiTo Equilibrada</span></div>
+                <div><strong>~86%</strong><span>AudiTo antes del loop detectado</span></div>
+            </div>
+        </section>
+
+        <section class="section compact" id="modelos">
+            <div class="section-heading">
+                <p class="eyebrow">PERFILES</p>
+                <h2>Lo que falta medir.</h2>
+            </div>
+            <div id="pending-results" class="models-grid"></div>
+        </section>
+
+        <section class="section compact">
+            <div class="panel">
+                <div><p class="eyebrow">V0.5</p><h2>Protección contra loops.</h2></div>
+                <p>AudiTo combina ajustes de decodificación con un filtro conservador de repeticiones anómalas. La nueva versión debe volver a medirse antes de afirmar una mejora porcentual.</p>
+            </div>
+        </section>
+    </main>
+
+    <footer>Copyright © 2026 · Renzo Fernando Mosquera Daza</footer>
+    <script src="app.js"></script>
+</body>
+</html>

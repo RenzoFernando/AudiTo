@@ -1,10 +1,26 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Signal
+from PySide6.QtCore import Qt, Signal
+from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QWidget
 
 from app.constants import DEFAULT_LANGUAGE, DEFAULT_PROFILE, LANGUAGES
 from app.domain.model_profile import ModelProfile
+
+
+class ChevronComboBox(QComboBox):
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        color = QColor("#cfd3da" if self.isEnabled() else "#5f646d")
+        pen = QPen(color, 1.6)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        center_x = self.width() - 13
+        center_y = self.height() // 2
+        painter.drawLine(center_x - 4, center_y - 2, center_x, center_y + 2)
+        painter.drawLine(center_x, center_y + 2, center_x + 4, center_y - 2)
 
 
 class SettingsWidget(QWidget):
@@ -23,10 +39,10 @@ class SettingsWidget(QWidget):
         profile_label.setObjectName("sectionLabel")
         output_label = QLabel("Guardar en")
         output_label.setObjectName("sectionLabel")
-        self.language_combo = QComboBox()
+        self.language_combo = ChevronComboBox()
         self.language_combo.addItems(list(LANGUAGES.keys()))
         self.language_combo.setCurrentText(language if language in LANGUAGES else DEFAULT_LANGUAGE)
-        self.profile_combo = QComboBox()
+        self.profile_combo = ChevronComboBox()
         self.profile_combo.addItems(ModelProfile.labels())
         self.profile_combo.setCurrentText(profile if profile in ModelProfile.labels() else DEFAULT_PROFILE)
         self.profile_hint = QLabel()
@@ -35,6 +51,7 @@ class SettingsWidget(QWidget):
         self.output_button = QPushButton("…")
         self.output_button.setObjectName("browseButton")
         self.output_button.setFixedWidth(36)
+        self.output_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         layout.addWidget(language_label, 0, 0)
         layout.addWidget(profile_label, 0, 1)
         layout.addWidget(self.language_combo, 1, 0)
