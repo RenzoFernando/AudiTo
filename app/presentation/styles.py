@@ -66,23 +66,33 @@ QLabel#modelHintLabel {
     color: #ff6572;
     font-size: 9px;
 }
+QLabel#footerLabel {
+    color: #767b84;
+    font-size: 8px;
+    font-weight: 500;
+}
 QFrame#audioInput {
     background-color: #171a20;
-    border: 1px dotted #3a3f48;
-    border-radius: 4px;
+    border: 2px dashed #343a44;
+    border-radius: 6px;
 }
 QFrame#audioInput[dragActive="true"] {
     background-color: #1b1e25;
-    border: 1px dotted #ff4655;
+    border: 2px dashed #ff4655;
 }
 QFrame#fileCard {
     background-color: #171a20;
-    border: 1px dotted #343943;
-    border-radius: 4px;
+    border: 2px dashed #343a44;
+    border-radius: 6px;
 }
 QFrame#progressFrame {
     background-color: transparent;
     border: none;
+}
+QFrame#footerDivider {
+    background-color: transparent;
+    border: none;
+    border-top: 1px dashed #2a2f38;
 }
 QFrame#accentRed {
     background-color: #ff4655;
@@ -99,8 +109,8 @@ QFrame#accentGraySoft {
 QPushButton {
     min-height: 30px;
     padding: 0 10px;
-    border-radius: 3px;
-    border: 1px dotted #3a4049;
+    border-radius: 4px;
+    border: 2px dashed #353b44;
     background-color: #1a1e24;
     color: #eceef1;
     font-size: 10px;
@@ -115,12 +125,12 @@ QPushButton:pressed {
 QPushButton:disabled {
     color: #5f646d;
     background-color: #14171b;
-    border-color: #292d34;
+    border-color: #262b33;
 }
 QPushButton#primaryButton {
     min-height: 36px;
     background-color: #ff4655;
-    border: 1px dotted #ff8a94;
+    border: 2px dashed #ff98a1;
     color: #ffffff;
     font-size: 10px;
     font-weight: 700;
@@ -131,7 +141,7 @@ QPushButton#primaryButton:hover {
 }
 QPushButton#cancelButton {
     min-height: 36px;
-    min-width: 86px;
+    min-width: 102px;
     background-color: transparent;
     color: #d8dade;
 }
@@ -167,7 +177,7 @@ QPushButton#openFileButton {
     border-color: #ff4655;
 }
 QPushButton#openFolderButton {
-    border-color: #444a54;
+    border-color: #353b44;
 }
 QPushButton#openFileButton:hover, QPushButton#openFolderButton:hover {
     background-color: #211a1d;
@@ -177,11 +187,14 @@ QPushButton#openFileButton:hover, QPushButton#openFolderButton:hover {
 QComboBox, QLineEdit {
     min-height: 30px;
     background-color: #171a20;
-    border: 1px dotted #3a4049;
-    border-radius: 3px;
+    border: 2px dashed #353b44;
+    border-radius: 4px;
     padding: 0 8px;
     color: #eff0f2;
     selection-background-color: #ff4655;
+}
+QComboBox {
+    padding-right: 26px;
 }
 QComboBox:hover, QLineEdit:hover {
     border-color: #5a606a;
@@ -190,12 +203,27 @@ QComboBox:focus, QLineEdit:focus {
     border-color: #ff4655;
 }
 QComboBox::drop-down {
+    subcontrol-origin: padding;
+    subcontrol-position: top right;
+    width: 26px;
     border: none;
-    width: 24px;
+    border-left: 2px dashed #2c3139;
+    background-color: #14181e;
+    border-top-right-radius: 4px;
+    border-bottom-right-radius: 4px;
+}
+QComboBox::down-arrow {
+    image: none;
+    width: 0px;
+    height: 0px;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid #cfd3da;
+    margin-right: 8px;
 }
 QComboBox QAbstractItemView {
     background-color: #171a20;
-    border: 1px dotted #3a4049;
+    border: 2px dashed #353b44;
     selection-background-color: #ff4655;
     outline: 0;
 }

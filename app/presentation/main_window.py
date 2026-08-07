@@ -59,20 +59,24 @@ class MainWindow(QMainWindow):
     def _build_ui(self) -> None:
         container = QWidget()
         root = QVBoxLayout(container)
-        root.setContentsMargins(18, 15, 18, 15)
+        root.setContentsMargins(18, 15, 18, 14)
         root.setSpacing(10)
 
         brand_row = QHBoxLayout()
-        brand_row.setSpacing(5)
+        brand_row.setContentsMargins(0, 0, 0, 2)
+        brand_row.setSpacing(10)
+
+        left_accents = self._accent_group(mirrored=True)
+        right_accents = self._accent_group(mirrored=False)
         brand = QLabel(APP_NAME)
         brand.setObjectName("brandLabel")
-        brand_row.addWidget(brand)
+        brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
+
+        brand_row.addWidget(left_accents)
         brand_row.addStretch(1)
-        for name, width in (("accentRed", 24), ("accentGrayStrong", 11), ("accentGraySoft", 6)):
-            accent = QFrame()
-            accent.setObjectName(name)
-            accent.setFixedSize(width, 3)
-            brand_row.addWidget(accent, 0, Qt.AlignmentFlag.AlignVCenter)
+        brand_row.addWidget(brand, 0, Qt.AlignmentFlag.AlignCenter)
+        brand_row.addStretch(1)
+        brand_row.addWidget(right_accents)
         root.addLayout(brand_row)
 
         self.input_widget = AudioInputWidget()
@@ -165,8 +169,33 @@ class MainWindow(QMainWindow):
         result_layout.addWidget(self.open_folder_button, 1)
         root.addLayout(result_layout)
 
-        root.addStretch(1)
+        footer_divider = QFrame()
+        footer_divider.setObjectName("footerDivider")
+        footer_divider.setFixedHeight(8)
+        root.addWidget(footer_divider)
+
+        footer = QLabel("Copyright © 2026 · Renzo Fernando Mosquera Daza")
+        footer.setObjectName("footerLabel")
+        footer.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        root.addWidget(footer)
+
         self.setCentralWidget(container)
+
+    def _accent_group(self, mirrored: bool) -> QWidget:
+        group = QWidget()
+        group.setFixedWidth(52)
+        layout = QHBoxLayout(group)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(5)
+        definitions = [("accentRed", 24), ("accentGrayStrong", 11), ("accentGraySoft", 6)]
+        if mirrored:
+            definitions = list(reversed(definitions))
+        for name, width in definitions:
+            accent = QFrame()
+            accent.setObjectName(name)
+            accent.setFixedSize(width, 3)
+            layout.addWidget(accent, 0, Qt.AlignmentFlag.AlignVCenter)
+        return group
 
     def _browse_files(self) -> None:
         patterns = " ".join(f"*{extension}" for extension in sorted(SUPPORTED_AUDIO_EXTENSIONS))
