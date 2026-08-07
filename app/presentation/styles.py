@@ -2,8 +2,8 @@ from __future__ import annotations
 
 APP_STYLE = """
 QMainWindow, QWidget {
-    background-color: #17191c;
-    color: #eceef0;
+    background-color: #0f1115;
+    color: #f0f1f3;
     font-family: "Segoe UI";
     font-size: 11px;
 }
@@ -12,150 +12,204 @@ QLabel {
     border: none;
 }
 QLabel#brandLabel {
-    font-size: 20px;
+    font-size: 21px;
     font-weight: 700;
-    color: #d84b4b;
+    color: #ff4655;
 }
 QLabel#sectionLabel {
-    color: #aeb3b9;
+    color: #b0b4bb;
     font-size: 10px;
     font-weight: 600;
 }
 QLabel#dropTitle {
-    color: #f3f4f5;
-    font-size: 14px;
+    color: #f7f7f8;
+    font-size: 13px;
     font-weight: 600;
 }
+QLabel#inputHelperLabel {
+    color: #a2a7af;
+    font-size: 9px;
+}
 QLabel#mutedLabel {
-    color: #858c94;
-    font-size: 10px;
+    color: #737984;
+    font-size: 9px;
 }
 QLabel#fileNameLabel {
-    color: #f0f1f2;
+    color: #f4f4f5;
     font-size: 11px;
     font-weight: 600;
 }
 QLabel#fileMetaLabel {
-    color: #89919a;
-    font-size: 10px;
+    color: #9298a2;
+    font-size: 9px;
+}
+QLabel#fileDot {
+    color: #ff4655;
+    font-size: 9px;
+}
+QLabel#fileDot[state="completed"], QLabel#fileDot[state="recorded"] {
+    color: #ff4655;
 }
 QLabel#progressStatusLabel {
-    color: #cfd3d7;
+    color: #d8dade;
     font-size: 10px;
+}
+QLabel#progressStatusLabel[state="completed"] {
+    color: #ff6572;
+    font-weight: 600;
 }
 QLabel#etaLabel {
-    color: #9ca3aa;
+    color: #8b9099;
     font-size: 10px;
 }
-QLabel#localLabel {
-    color: #84b99a;
-    font-size: 10px;
+QLabel#modelHintLabel {
+    color: #ff6572;
+    font-size: 9px;
 }
-QFrame#dropZone {
-    background-color: #1d2024;
-    border: 1px dashed #464c53;
-    border-radius: 9px;
+QFrame#audioInput {
+    background-color: #171a20;
+    border: 1px dotted #3a3f48;
+    border-radius: 4px;
 }
-QFrame#dropZone[dragActive="true"] {
-    background-color: #22262b;
-    border: 1px solid #d84b4b;
+QFrame#audioInput[dragActive="true"] {
+    background-color: #1b1e25;
+    border: 1px dotted #ff4655;
 }
 QFrame#fileCard {
-    background-color: #1d2024;
-    border: 1px solid #2c3137;
-    border-radius: 8px;
+    background-color: #171a20;
+    border: 1px dotted #343943;
+    border-radius: 4px;
 }
 QFrame#progressFrame {
     background-color: transparent;
     border: none;
 }
-QFrame#footerFrame {
-    background-color: transparent;
-    border-top: 1px solid #272b30;
+QFrame#accentRed {
+    background-color: #ff4655;
+    border: none;
+}
+QFrame#accentGrayStrong {
+    background-color: #4a4f58;
+    border: none;
+}
+QFrame#accentGraySoft {
+    background-color: #2b2f36;
+    border: none;
 }
 QPushButton {
-    min-height: 31px;
-    padding: 0 11px;
-    border-radius: 7px;
-    border: 1px solid #343a40;
-    background-color: #23272c;
-    color: #e8eaec;
-    font-size: 11px;
+    min-height: 30px;
+    padding: 0 10px;
+    border-radius: 3px;
+    border: 1px dotted #3a4049;
+    background-color: #1a1e24;
+    color: #eceef1;
+    font-size: 10px;
 }
 QPushButton:hover {
-    background-color: #2a2f35;
-    border-color: #41484f;
+    background-color: #22262d;
+    border-color: #ff4655;
 }
 QPushButton:pressed {
-    background-color: #202429;
+    background-color: #171a20;
 }
 QPushButton:disabled {
-    color: #666d74;
-    background-color: #1d2024;
-    border-color: #292e33;
+    color: #5f646d;
+    background-color: #14171b;
+    border-color: #292d34;
 }
 QPushButton#primaryButton {
-    min-height: 37px;
-    background-color: #cf4747;
-    border-color: #cf4747;
+    min-height: 36px;
+    background-color: #ff4655;
+    border: 1px dotted #ff8a94;
     color: #ffffff;
-    font-size: 11px;
+    font-size: 10px;
     font-weight: 700;
 }
 QPushButton#primaryButton:hover {
-    background-color: #da5050;
-    border-color: #da5050;
+    background-color: #f33f4f;
+    border-color: #ffffff;
 }
 QPushButton#cancelButton {
-    min-height: 37px;
+    min-height: 36px;
+    min-width: 86px;
     background-color: transparent;
-    color: #cfd2d5;
+    color: #d8dade;
 }
 QPushButton#secondaryButton {
-    min-height: 29px;
+    min-height: 27px;
     padding: 0 12px;
-    background-color: #252a2f;
+    background-color: #1d2127;
+}
+QPushButton#recordButton {
+    min-height: 27px;
+    min-width: 72px;
+    background-color: transparent;
+    border-color: #ff4655;
+    color: #ff6572;
+    font-weight: 600;
+}
+QPushButton#recordButton[recording="true"] {
+    background-color: #ff4655;
+    border-color: #ff8a94;
+    color: #ffffff;
 }
 QPushButton#browseButton {
-    min-height: 31px;
+    min-height: 30px;
     padding: 0;
 }
+QPushButton#openFileButton, QPushButton#openFolderButton {
+    min-height: 30px;
+    background-color: #171a20;
+    color: #e8eaed;
+    font-weight: 600;
+}
+QPushButton#openFileButton {
+    border-color: #ff4655;
+}
+QPushButton#openFolderButton {
+    border-color: #444a54;
+}
+QPushButton#openFileButton:hover, QPushButton#openFolderButton:hover {
+    background-color: #211a1d;
+    border-color: #ff4655;
+    color: #ffffff;
+}
 QComboBox, QLineEdit {
-    min-height: 31px;
-    background-color: #1d2024;
-    border: 1px solid #343a40;
-    border-radius: 7px;
-    padding: 0 9px;
-    color: #e8eaec;
-    selection-background-color: #cf4747;
+    min-height: 30px;
+    background-color: #171a20;
+    border: 1px dotted #3a4049;
+    border-radius: 3px;
+    padding: 0 8px;
+    color: #eff0f2;
+    selection-background-color: #ff4655;
 }
 QComboBox:hover, QLineEdit:hover {
-    border-color: #444b52;
+    border-color: #5a606a;
 }
 QComboBox:focus, QLineEdit:focus {
-    border-color: #b84646;
+    border-color: #ff4655;
 }
 QComboBox::drop-down {
     border: none;
-    width: 26px;
+    width: 24px;
 }
 QComboBox QAbstractItemView {
-    background-color: #1d2024;
-    border: 1px solid #343a40;
-    selection-background-color: #cf4747;
+    background-color: #171a20;
+    border: 1px dotted #3a4049;
+    selection-background-color: #ff4655;
     outline: 0;
 }
 QProgressBar {
-    min-height: 6px;
-    max-height: 6px;
+    min-height: 5px;
+    max-height: 5px;
     border: none;
-    border-radius: 3px;
-    background-color: #2a2f34;
+    border-radius: 2px;
+    background-color: #2a2e35;
     text-align: center;
     color: transparent;
 }
 QProgressBar::chunk {
-    background-color: #cf4747;
-    border-radius: 3px;
+    background-color: #ff4655;
+    border-radius: 2px;
 }
 """

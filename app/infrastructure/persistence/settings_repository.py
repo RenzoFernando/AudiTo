@@ -16,8 +16,6 @@ class SettingsRepository:
             "language": DEFAULT_LANGUAGE,
             "profile": DEFAULT_PROFILE,
             "output_dir": str(Path.home() / "Documents" / "Transcripciones"),
-            "window_width": 460,
-            "window_height": 540,
         }
         if not self._path.exists():
             return defaults
@@ -26,8 +24,6 @@ class SettingsRepository:
             defaults.update({key: value for key, value in data.items() if key in defaults})
         except Exception:
             pass
-        defaults["window_width"] = min(470, max(430, int(defaults["window_width"])))
-        defaults["window_height"] = min(560, max(500, int(defaults["window_height"])))
         return defaults
 
     def save(self, settings: dict) -> None:

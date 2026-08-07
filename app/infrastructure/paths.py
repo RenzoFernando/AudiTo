@@ -32,3 +32,13 @@ def ffmpeg_dir() -> Path:
     path = base_dir() / "ffmpeg"
     path.mkdir(parents=True, exist_ok=True)
     return path
+
+
+def assets_dir() -> Path:
+    path = base_dir() / "assets"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
+
+
+def app_icon_path() -> Path:
+    return assets_dir() / "icon.png"

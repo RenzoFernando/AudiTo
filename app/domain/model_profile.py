@@ -9,12 +9,14 @@ class ProfileDefinition:
     label: str
     model_name: str
     beam_size: int
+    hint: str
 
 
 class ModelProfile(Enum):
-    FAST = ProfileDefinition("Rápida", "base", 1)
-    BALANCED = ProfileDefinition("Equilibrada", "small", 3)
-    MAXIMUM = ProfileDefinition("Máxima", "medium", 5)
+    BASE = ProfileDefinition("Base", "base", 1, "Más ligero · menor precisión")
+    FAST = ProfileDefinition("Rápida", "small", 3, "Rápida · buena para uso diario")
+    BALANCED = ProfileDefinition("Equilibrada", "medium", 5, "Más precisa · mayor consumo")
+    MAXIMUM = ProfileDefinition("Máxima", "large-v3", 5, "Máxima precisión · más lenta")
 
     @property
     def label(self) -> str:
@@ -27,6 +29,10 @@ class ModelProfile(Enum):
     @property
     def beam_size(self) -> int:
         return self.value.beam_size
+
+    @property
+    def hint(self) -> str:
+        return self.value.hint
 
     @classmethod
     def from_label(cls, label: str) -> "ModelProfile":

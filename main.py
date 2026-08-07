@@ -22,7 +22,7 @@ def _prepare_environment() -> None:
 def _ensure_dependencies() -> None:
     if getattr(sys, "frozen", False):
         return
-    required = ("PySide6", "faster_whisper")
+    required = ("PySide6", "faster_whisper", "sounddevice")
     missing = [module for module in required if importlib.util.find_spec(module) is None]
     if not missing:
         return
@@ -42,9 +42,11 @@ def main() -> int:
     _prepare_environment()
     _ensure_dependencies()
     from PySide6.QtCore import Qt
+    from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
     from app.constants import APP_NAME
     from app.infrastructure.logging_setup import configure_logging
+    from app.infrastructure.paths import app_icon_path
     from app.presentation.main_window import MainWindow
 
     configure_logging()
@@ -54,6 +56,9 @@ def main() -> int:
     application.setApplicationName(APP_NAME)
     application.setOrganizationName(APP_NAME)
     application.setStyle("Fusion")
+    icon_path = app_icon_path()
+    if icon_path.exists():
+        application.setWindowIcon(QIcon(str(icon_path)))
     window = MainWindow()
     window.show()
     return application.exec()

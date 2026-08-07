@@ -17,10 +17,10 @@ class DropZone(QFrame):
         self.setObjectName("dropZone")
         self.setAcceptDrops(True)
         self.setProperty("dragActive", False)
-        self.setFixedHeight(116)
+        self.setFixedHeight(102)
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(18, 14, 18, 14)
-        layout.setSpacing(4)
+        layout.setContentsMargins(16, 10, 16, 10)
+        layout.setSpacing(3)
         layout.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title = QLabel("Arrastra un audio aquí")
         title.setObjectName("dropTitle")
@@ -36,7 +36,6 @@ class DropZone(QFrame):
         button.clicked.connect(self.browse_requested.emit)
         layout.addWidget(title)
         layout.addWidget(formats)
-        layout.addSpacing(2)
         layout.addWidget(button, 0, Qt.AlignmentFlag.AlignCenter)
         self._button = button
 

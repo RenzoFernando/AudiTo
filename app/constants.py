@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 APP_NAME = "AudiTo"
-APP_VERSION = "0.2.0"
+APP_VERSION = "0.4.0"
 SUPPORTED_AUDIO_EXTENSIONS = {
     ".mp3",
     ".m4a",
@@ -20,4 +20,7 @@ LANGUAGES = {
     "Automático": None,
 }
 DEFAULT_LANGUAGE = "Español"
-DEFAULT_PROFILE = "Equilibrada"
+DEFAULT_PROFILE = "Rápida"
+TIMESTAMP_BLOCK_SECONDS = 35.0
+WINDOW_WIDTH = 470
+WINDOW_HEIGHT = 560
