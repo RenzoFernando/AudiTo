@@ -4,16 +4,25 @@ cd /d "%~dp0"
 set "PROJECT_ROOT=%cd%"
 set "ENTRY_POINT=main.py"
 set "VENV_PYTHON=.venv\Scripts\python.exe"
-set "META_CMD=.build_meta.cmd"
-set "VERSION_FILE=.build_version_info.txt"
+set "META_CMD=.build_meta_installer.cmd"
+set "VERSION_FILE=.build_version_info_installer.txt"
 set "INSTALLER_SCRIPT=.build_installer.iss"
-set "STAGE_DIR=build\installer_payload"
+set "BUILD_ROOT=build\installer"
+set "DIST_DIR=%BUILD_ROOT%\dist"
+set "WORK_DIR=%BUILD_ROOT%\pyinstaller"
+set "SPEC_DIR=%BUILD_ROOT%\spec"
+set "STAGE_DIR=%BUILD_ROOT%\payload"
 set "ISCC_CMD="
 if exist "%VENV_PYTHON%" (
     set "PYTHON_CMD=%VENV_PYTHON%"
 ) else (
     set "PYTHON_CMD=python"
 )
+call :cleanup_crash_reports
+if exist "%BUILD_ROOT%" rmdir /s /q "%BUILD_ROOT%"
+if exist "%META_CMD%" del /q "%META_CMD%"
+if exist "%VERSION_FILE%" del /q "%VERSION_FILE%"
+if exist "%INSTALLER_SCRIPT%" del /q "%INSTALLER_SCRIPT%"
 echo.
 echo =======================================================
 echo  Compilacion instalador AudiTo
@@ -28,11 +37,8 @@ if errorlevel 1 goto meta_error
 "%PYTHON_CMD%" build_version_info.py "%VERSION_FILE%"
 if errorlevel 1 goto version_error
 if not exist "%ICON_FILE%" goto icon_error
-if exist "dist" rmdir /s /q "dist"
-if exist "build\pyinstaller" rmdir /s /q "build\pyinstaller"
-if exist "build\%APP_NAME%.spec" del /q "build\%APP_NAME%.spec"
-if exist "%STAGE_DIR%" rmdir /s /q "%STAGE_DIR%"
 if not exist "%STAGE_DIR%" mkdir "%STAGE_DIR%"
+if not exist "%SPEC_DIR%" mkdir "%SPEC_DIR%"
 if not exist "%OUTPUT_FOLDER%" mkdir "%OUTPUT_FOLDER%"
 if exist "%OUTPUT_FOLDER%\%INSTALLER_NAME%" del /q "%OUTPUT_FOLDER%\%INSTALLER_NAME%"
 "%PYTHON_CMD%" -m PyInstaller ^
@@ -49,15 +55,16 @@ if exist "%OUTPUT_FOLDER%\%INSTALLER_NAME%" del /q "%OUTPUT_FOLDER%\%INSTALLER_N
     --collect-all faster_whisper ^
     --collect-all tokenizers ^
     --collect-all huggingface_hub ^
-    --distpath "%PROJECT_ROOT%\dist" ^
-    --workpath "%PROJECT_ROOT%\build\pyinstaller" ^
-    --specpath "%PROJECT_ROOT%\build" ^
+    --distpath "%PROJECT_ROOT%\%DIST_DIR%" ^
+    --workpath "%PROJECT_ROOT%\%WORK_DIR%" ^
+    --specpath "%PROJECT_ROOT%\%SPEC_DIR%" ^
     "%PROJECT_ROOT%\%ENTRY_POINT%"
 if errorlevel 1 goto fail
-move /y "dist\%APP_EXE_NAME%" "%STAGE_DIR%\%APP_EXE_NAME%" >nul
+move /y "%DIST_DIR%\%APP_EXE_NAME%" "%STAGE_DIR%\%APP_EXE_NAME%" >nul
 if errorlevel 1 goto fail
 > "%STAGE_DIR%\%INSTALL_MARKER_FILE%" echo installed
 call :resolve_iscc
+if not defined ISCC_CMD call :install_iscc
 if not defined ISCC_CMD goto iscc_error
 > "%INSTALLER_SCRIPT%" echo [Setup]
 >> "%INSTALLER_SCRIPT%" echo AppId={{42698D03-F13F-4F48-9488-AEE60958D686}
@@ -103,13 +110,7 @@ if not defined ISCC_CMD goto iscc_error
 >> "%INSTALLER_SCRIPT%" echo Filename: "{app}\%APP_EXE_NAME%"; Description: "Abrir %PRODUCT_NAME% ahora"; WorkingDir: "{app}"; Flags: nowait postinstall skipifsilent unchecked runasoriginaluser
 "%ISCC_CMD%" "%INSTALLER_SCRIPT%"
 if errorlevel 1 goto fail
-if exist "dist" rmdir /s /q "dist"
-if exist "build\pyinstaller" rmdir /s /q "build\pyinstaller"
-if exist "build\%APP_NAME%.spec" del /q "build\%APP_NAME%.spec"
-if exist "%STAGE_DIR%" rmdir /s /q "%STAGE_DIR%"
-if exist "%INSTALLER_SCRIPT%" del /q "%INSTALLER_SCRIPT%"
-if exist "%VERSION_FILE%" del /q "%VERSION_FILE%"
-if exist "%META_CMD%" del /q "%META_CMD%"
+call :cleanup_build
 echo.
 echo =======================================================
 echo  Instalador generado correctamente
@@ -130,6 +131,29 @@ if exist "%ProgramFiles%\Inno Setup 6\ISCC.exe" set "ISCC_CMD=%ProgramFiles%\Inn
 if defined ISCC_CMD goto :eof
 if exist "%LocalAppData%\Programs\Inno Setup 6\ISCC.exe" set "ISCC_CMD=%LocalAppData%\Programs\Inno Setup 6\ISCC.exe"
 goto :eof
+:install_iscc
+echo.
+echo Inno Setup 6 no esta instalado. Intentando instalarlo automaticamente...
+where winget.exe >nul 2>&1
+if errorlevel 1 goto :eof
+winget install --id JRSoftware.InnoSetup -e --source winget --scope user --silent --accept-package-agreements --accept-source-agreements
+if errorlevel 1 goto :eof
+set "ISCC_CMD="
+call :resolve_iscc
+goto :eof
+:cleanup_build
+if exist "%BUILD_ROOT%" rmdir /s /q "%BUILD_ROOT%"
+if exist "%INSTALLER_SCRIPT%" del /q "%INSTALLER_SCRIPT%"
+if exist "%VERSION_FILE%" del /q "%VERSION_FILE%"
+if exist "%META_CMD%" del /q "%META_CMD%"
+call :cleanup_crash_reports
+goto :eof
+:cleanup_crash_reports
+del /q "%PROJECT_ROOT%\NuGetCrashReport*" >nul 2>&1
+for /d %%D in ("%PROJECT_ROOT%\NuGetCrashReport*") do rmdir /s /q "%%~fD" >nul 2>&1
+del /q "%TEMP%\NuGetCrashReport*" >nul 2>&1
+for /d %%D in ("%TEMP%\NuGetCrashReport*") do rmdir /s /q "%%~fD" >nul 2>&1
+goto :eof
 :meta_error
 echo ERROR: No se pudieron cargar los metadatos desde app\app_meta.py.
 goto cleanup_fail
@@ -140,17 +164,11 @@ goto cleanup_fail
 echo ERROR: No se encontro el icono %ICON_FILE%.
 goto cleanup_fail
 :iscc_error
-echo ERROR: No se encontro Inno Setup 6. Instala Inno Setup 6 o define ISCC_PATH.
+echo ERROR: No se encontro Inno Setup 6 y no fue posible instalarlo automaticamente. Instala Inno Setup 6 o define ISCC_PATH.
 goto cleanup_fail
 :fail
 echo ERROR: La generacion del instalador fallo.
 :cleanup_fail
-if exist "dist" rmdir /s /q "dist"
-if exist "build\pyinstaller" rmdir /s /q "build\pyinstaller"
-if exist "build\%APP_NAME%.spec" del /q "build\%APP_NAME%.spec"
-if exist "%STAGE_DIR%" rmdir /s /q "%STAGE_DIR%"
-if exist "%INSTALLER_SCRIPT%" del /q "%INSTALLER_SCRIPT%"
-if exist "%VERSION_FILE%" del /q "%VERSION_FILE%"
-if exist "%META_CMD%" del /q "%META_CMD%"
+call :cleanup_build
 pause
 exit /b 1

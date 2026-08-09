@@ -17,6 +17,7 @@ def _project_root() -> Path:
 def _prepare_environment() -> None:
     from app.infrastructure.system.app_paths import AppPaths
 
+    AppPaths.cleanup_legacy_layout()
     os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
     os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
     os.environ.setdefault("HF_HOME", str(AppPaths.huggingface_cache_dir()))
@@ -50,7 +51,6 @@ def main() -> int:
     from PySide6.QtWidgets import QApplication
     from app.app_meta import APP_COMPANY_NAME
     from app.constants import APP_NAME
-    from app.infrastructure.logging_setup import configure_logging
     from app.infrastructure.system.app_paths import AppPaths
     from app.presentation.main_window import MainWindow
 
@@ -60,7 +60,6 @@ def main() -> int:
     application.setOrganizationName(APP_COMPANY_NAME)
     application.setStyle("Fusion")
     AppPaths.cleanup_temp()
-    configure_logging()
     logging.getLogger("huggingface_hub").setLevel(logging.ERROR)
     icon_path = AppPaths.app_icon_path()
     if icon_path.exists():

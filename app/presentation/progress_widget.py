@@ -50,6 +50,15 @@ class ProgressWidget(QFrame):
         self.detail_label.setText(detail)
         self._set_state("idle")
 
+    def set_download_progress(self, value: int, detail: str = "") -> None:
+        value = max(0, min(100, int(value)))
+        self.progress.setVisible(True)
+        self.progress.setRange(0, 100)
+        self.progress.setValue(value)
+        self.status_label.setText(tr(self._ui_language, "status_downloading_model_percent", value=value))
+        self.detail_label.setText(detail)
+        self._set_state("idle")
+
     def set_finalizing_progress(self, value: int, detail: str = "") -> None:
         value = max(0, min(100, int(value)))
         self.progress.setVisible(True)

@@ -26,6 +26,7 @@ from app.presentation.settings_widget import SettingsWidget
 from app.presentation.styles import APP_STYLE
 from app.presentation.translations import tr, translate_runtime_message
 from app.workers.live_transcription_worker import LiveTranscriptionWorker
+from app.workers.model_download_worker import ModelDownloadWorker
 from app.workers.transcription_worker import TranscriptionWorker
 
 
@@ -41,6 +42,7 @@ class MainWindow(QMainWindow):
         self._recording_service = RecordingService()
         self._state = AppState.IDLE
         self._worker: TranscriptionWorker | None = None
+        self._model_worker: ModelDownloadWorker | None = None
         self._live_worker: LiveTranscriptionWorker | None = None
         self._live_service: LiveTranscriptionService | None = None
         self._current_job_id: str | None = None
@@ -59,6 +61,8 @@ class MainWindow(QMainWindow):
         self._finalization_started_at: float | None = None
         self._finalization_eta_seconds: float | None = None
         self._finalization_stage = "processing"
+        self._finalization_download_percent: int | None = None
+        self._model_notice_profiles: set[str] = set()
         self._record_timer = QTimer(self)
         self._record_timer.setInterval(250)
         self._record_timer.timeout.connect(self._update_recording_time)
@@ -87,7 +91,7 @@ class MainWindow(QMainWindow):
         brand_row.setSpacing(8)
         brand_row.addWidget(self._accent_group(True))
         brand_row.addStretch(1)
-        brand = QLabel(APP_NAME)
+        brand = QLabel(f"{APP_NAME} v{APP_VERSION}")
         brand.setObjectName("brandLabel")
         brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
         brand_row.addWidget(brand, 0, Qt.AlignmentFlag.AlignCenter)
@@ -165,6 +169,10 @@ class MainWindow(QMainWindow):
         self.github_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.github_button.clicked.connect(self._open_github)
         footer_layout.addWidget(self.github_button)
+        self.author_label = QLabel()
+        self.author_label.setObjectName("footerLabel")
+        self.author_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        footer_layout.addWidget(self.author_label)
         footer_layout.addStretch(1)
         shell_layout.addWidget(content)
         shell_layout.addWidget(footer)
@@ -195,12 +203,38 @@ class MainWindow(QMainWindow):
     def _refresh_static_text(self) -> None:
         self.language_toggle_button.setText(self._t("app_language_code"))
         self.language_toggle_button.setToolTip(self._t("switch_language_tooltip"))
-        self.transcribe_button.setText(self._t("transcribe"))
+        self._refresh_primary_action_text()
         self.cancel_button.setText(self._t("cancel"))
         self.open_file_button.setText(self._t("open_transcription"))
         self.open_folder_button.setText(self._t("open_folder"))
-        self.footer_label.setText(f"Copyright © 2026 · Renzo Fernando Mosquera Daza · v{APP_VERSION} ·")
+        self.footer_label.setText("Copyright © 2026 ·")
+        self.author_label.setText("· Renzo Fernando Mosquera Daza")
         self.github_button.setToolTip(self._t("github_tooltip"))
+
+    def _selected_model_profile(self) -> ModelProfile:
+        return ModelProfile.from_label(self.settings_widget.selected_profile())
+
+    def _selected_model_is_available(self) -> bool:
+        try:
+            return self._model_repository.is_available(self._selected_model_profile())
+        except Exception:
+            return False
+
+    def _refresh_primary_action_text(self) -> None:
+        key = "transcribe" if self._selected_model_is_available() else "download_model"
+        self.transcribe_button.setText(self._t(key))
+
+    def _show_model_notice_if_needed(self, recording: bool = False) -> None:
+        profile = self._selected_model_profile()
+        if self._model_repository.is_available(profile) or profile.label in self._model_notice_profiles:
+            return
+        self._model_notice_profiles.add(profile.label)
+        key = "first_recording_model_message" if recording else "first_model_message"
+        QMessageBox.information(
+            self,
+            self._t("first_model_title"),
+            self._t(key, profile=self.settings_widget.profile_combo.currentText()),
+        )
 
     def _toggle_ui_language(self) -> None:
         if not self._is_stable_state():
@@ -254,6 +288,7 @@ class MainWindow(QMainWindow):
         if ignored_count:
             self.progress_widget.set_idle(self._t("status_one_audio"), self._t("one_audio_at_time"))
         self._set_state(AppState.AUDIO_SELECTED)
+        self._show_model_notice_if_needed()
 
     def _clear_audio(self) -> None:
         if not self._is_stable_state():
@@ -266,6 +301,9 @@ class MainWindow(QMainWindow):
 
     def _update_selected_settings(self, language: str, profile: str) -> None:
         self._current_audio.update_settings(language, profile)
+        self._apply_state()
+        if self._current_audio.job is not None:
+            self._show_model_notice_if_needed()
 
     def _preferences_changed(self) -> None:
         self._save_settings()
@@ -297,6 +335,7 @@ class MainWindow(QMainWindow):
     def _start_recording(self) -> None:
         if not self._is_stable_state():
             return
+        self._show_model_notice_if_needed(recording=True)
         output_dir = self._output_directory()
         if output_dir is None:
             return
@@ -438,13 +477,17 @@ class MainWindow(QMainWindow):
         if job is None:
             QMessageBox.information(self, self._t("no_audio_title"), self._t("no_audio_message"))
             return
-        output_dir = self._output_directory()
-        if output_dir is None:
-            return
         self._current_audio.update_settings(
             self.settings_widget.selected_language(),
             self.settings_widget.selected_profile(),
         )
+        profile = job.model_profile
+        if not self._model_repository.is_available(profile):
+            self._start_model_download(profile)
+            return
+        output_dir = self._output_directory()
+        if output_dir is None:
+            return
         job.status = JobStatus.PENDING
         job.progress = 0
         job.error = None
@@ -465,6 +508,48 @@ class MainWindow(QMainWindow):
         self._worker = worker
         worker.start()
 
+    def _start_model_download(self, profile: ModelProfile) -> None:
+        if self._model_worker is not None and self._model_worker.isRunning():
+            return
+        self.progress_widget.set_download_progress(0, self._t("first_time_only"))
+        worker = ModelDownloadWorker(profile, self._model_repository, self)
+        worker.status_changed.connect(self._on_model_download_status)
+        worker.completed.connect(self._on_model_download_completed)
+        worker.failed.connect(self._on_model_download_failed)
+        worker.finished.connect(lambda worker=worker: self._dispose_model_worker(worker))
+        self._model_worker = worker
+        worker.start()
+        self._apply_state()
+
+    def _model_download_percent(self, status: str) -> int | None:
+        prefix = "MODEL_DOWNLOAD_PROGRESS:"
+        if not status.startswith(prefix):
+            return None
+        try:
+            return max(0, min(100, int(status[len(prefix):])))
+        except ValueError:
+            return None
+
+    def _on_model_download_status(self, status: str) -> None:
+        percent = self._model_download_percent(status)
+        if percent is not None:
+            self.progress_widget.set_download_progress(percent, self._t("first_time_only"))
+            return
+        if status == "Cargando modelo":
+            self.progress_widget.set_indeterminate(self._t("status_loading_model"), self._t("preparing_transcription"))
+            return
+        self.progress_widget.set_indeterminate(self._runtime_message(status), "")
+
+    def _on_model_download_completed(self, profile_label: str) -> None:
+        self.progress_widget.set_completed(self._t("model_download_completed"), "")
+        self._save_settings()
+        self._apply_state()
+
+    def _on_model_download_failed(self, message: str) -> None:
+        self.progress_widget.set_idle(self._t("model_download_failed_title"), "")
+        QMessageBox.warning(self, self._t("model_download_failed_title"), self._runtime_message(message))
+        self._apply_state()
+
     def _cancel_current(self) -> None:
         if self._worker and self._worker.isRunning() and self._current_job_id:
             self.progress_widget.set_indeterminate(self._t("status_cancelling"), self._t("partial_kept"))
@@ -477,6 +562,10 @@ class MainWindow(QMainWindow):
         self._apply_state()
 
     def _on_job_status(self, job_id: str, status: str) -> None:
+        download_percent = self._model_download_percent(status)
+        if download_percent is not None:
+            self.progress_widget.set_download_progress(download_percent, self._t("first_time_only"))
+            return
         if status == "Descargando modelo por primera vez":
             self.progress_widget.set_indeterminate(self._t("status_downloading_model"), self._t("first_time_only"))
             return
@@ -546,16 +635,26 @@ class MainWindow(QMainWindow):
     def _on_live_status(self, status: str) -> None:
         if self._discard_restore_pending:
             return
+        download_percent = self._model_download_percent(status)
         if self._state == AppState.FINALIZING_RECORDING:
-            if status == "Descargando modelo por primera vez":
+            if download_percent is not None:
                 self._finalization_stage = "downloading"
+                self._finalization_download_percent = download_percent
+            elif status == "Descargando modelo por primera vez":
+                self._finalization_stage = "downloading"
+                self._finalization_download_percent = None
             elif status == "Cargando modelo":
                 self._finalization_stage = "loading"
+                self._finalization_download_percent = None
             elif status == "Transcribiendo":
                 self._finalization_stage = "processing"
+                self._finalization_download_percent = None
             self._update_finalization_progress()
             return
         if not self._recording_service.is_recording:
+            return
+        if download_percent is not None:
+            self.progress_widget.set_download_progress(download_percent, self._t("first_time_only"))
             return
         if status == "Descargando modelo por primera vez":
             self.progress_widget.set_recording(self._t("status_recording"), self._t("downloading_transcription_model"))
@@ -656,7 +755,10 @@ class MainWindow(QMainWindow):
         if self._state != AppState.FINALIZING_RECORDING and self._finalization_duration <= 0:
             return
         if self._finalization_stage == "downloading":
-            self.progress_widget.set_indeterminate(self._t("status_finalizing"), self._t("finalizing_download_model"))
+            if self._finalization_download_percent is None:
+                self.progress_widget.set_indeterminate(self._t("status_finalizing"), self._t("finalizing_download_model"))
+            else:
+                self.progress_widget.set_download_progress(self._finalization_download_percent, self._t("finalizing_download_model"))
             return
         if self._finalization_stage == "loading":
             self.progress_widget.set_indeterminate(self._t("status_finalizing"), self._t("finalizing_load_model"))
@@ -687,6 +789,7 @@ class MainWindow(QMainWindow):
         self._finalization_started_at = None
         self._finalization_eta_seconds = None
         self._finalization_stage = "processing"
+        self._finalization_download_percent = None
 
     def _restore_after_discard(self) -> None:
         self._discard_restore_pending = False
@@ -719,6 +822,7 @@ class MainWindow(QMainWindow):
     def _apply_state(self) -> None:
         stable = self._is_stable_state()
         has_audio = self._current_audio.job is not None
+        self._refresh_primary_action_text()
         self.input_widget.set_interactions_enabled(stable)
         self.settings_widget.set_interactions_enabled(stable)
         self.language_toggle_button.setEnabled(stable)
@@ -729,7 +833,8 @@ class MainWindow(QMainWindow):
         self.open_folder_button.setEnabled(bool(self.settings_widget.output_edit.text().strip()))
 
     def _is_stable_state(self) -> bool:
-        return self._state in {
+        model_download_active = self._model_worker is not None and self._model_worker.isRunning()
+        return not model_download_active and self._state in {
             AppState.IDLE,
             AppState.AUDIO_SELECTED,
             AppState.COMPLETED,
@@ -791,12 +896,22 @@ class MainWindow(QMainWindow):
         worker.deleteLater()
         self._apply_state()
 
+    def _dispose_model_worker(self, worker: ModelDownloadWorker) -> None:
+        if self._model_worker is worker:
+            self._model_worker = None
+        worker.deleteLater()
+        self._apply_state()
+
     def _dispose_live_worker(self, worker: LiveTranscriptionWorker) -> None:
         if self._live_worker is worker:
             self._live_worker = None
         worker.deleteLater()
 
     def closeEvent(self, event) -> None:
+        if self._model_worker is not None and self._model_worker.isRunning():
+            QMessageBox.information(self, self._t("model_download_in_progress_title"), self._t("model_download_in_progress_message"))
+            event.ignore()
+            return
         active = self._recording_service.is_recording or (self._worker and self._worker.isRunning()) or (self._live_worker and self._live_worker.isRunning())
         if active:
             message = self._t("close_recording_message") if self._recording_service.is_recording else self._t("close_process_message")
@@ -825,4 +940,3 @@ class MainWindow(QMainWindow):
             self._live_worker.wait(5000)
         self._save_settings()
         event.accept()
-
