@@ -38,6 +38,7 @@ class MainWindow(QMainWindow):
         self._settings = self._settings_repository.load()
         self._ui_language = self._settings["ui_language"]
         self._model_repository = ModelRepository()
+        self._invalid_model_profiles = self._model_repository.validate_installed_models()
         self._current_audio = CurrentAudioService()
         self._recording_service = RecordingService()
         self._state = AppState.IDLE
@@ -63,6 +64,11 @@ class MainWindow(QMainWindow):
         self._finalization_stage = "processing"
         self._finalization_download_percent: int | None = None
         self._model_notice_profiles: set[str] = set()
+        self._model_cancel_requested = False
+        self._file_cancel_requested = False
+        self._live_cancel_requested_by_user = False
+        self._close_requested = False
+        self._allow_close = False
         self._record_timer = QTimer(self)
         self._record_timer.setInterval(250)
         self._record_timer.timeout.connect(self._update_recording_time)
@@ -76,6 +82,9 @@ class MainWindow(QMainWindow):
         self.input_widget.set_microphone_name(self._recording_service.default_input_name())
         self._refresh_static_text()
         self._apply_state()
+        self._save_settings()
+        if self._invalid_model_profiles:
+            QTimer.singleShot(0, self._show_invalid_models_warning)
 
     def _build_ui(self) -> None:
         shell = QWidget()
@@ -221,19 +230,45 @@ class MainWindow(QMainWindow):
             return False
 
     def _refresh_primary_action_text(self) -> None:
-        key = "transcribe" if self._selected_model_is_available() else "download_model"
+        model_available = self._selected_model_is_available()
+        has_audio = self._current_audio.job is not None
+        key = "transcribe" if model_available else "download_model"
         self.transcribe_button.setText(self._t(key))
+        if not model_available:
+            tooltip_key = "download_model_tooltip"
+        elif not has_audio:
+            tooltip_key = "transcribe_needs_audio_tooltip"
+        else:
+            tooltip_key = "transcribe_ready_tooltip"
+        self.transcribe_button.setToolTip(self._t(tooltip_key))
 
-    def _show_model_notice_if_needed(self, recording: bool = False) -> None:
+    def _profile_display_name(self, profile_label: str) -> str:
+        keys = {
+            "Rápida": "profile_fast",
+            "Equilibrada": "profile_balanced",
+            "Máxima": "profile_maximum",
+        }
+        return self._t(keys.get(profile_label, "profile_balanced"))
+
+    def _show_invalid_models_warning(self) -> None:
+        if not self._invalid_model_profiles:
+            return
+        profiles = ", ".join(self._profile_display_name(label) for label in self._invalid_model_profiles)
+        QMessageBox.warning(
+            self,
+            self._t("model_validation_failed_title"),
+            self._t("model_validation_failed_message", profiles=profiles),
+        )
+
+    def _show_model_notice_if_needed(self) -> None:
         profile = self._selected_model_profile()
         if self._model_repository.is_available(profile) or profile.label in self._model_notice_profiles:
             return
         self._model_notice_profiles.add(profile.label)
-        key = "first_recording_model_message" if recording else "first_model_message"
         QMessageBox.information(
             self,
             self._t("first_model_title"),
-            self._t(key, profile=self.settings_widget.profile_combo.currentText()),
+            self._t("first_model_message", profile=self.settings_widget.profile_combo.currentText()),
         )
 
     def _toggle_ui_language(self) -> None:
@@ -251,7 +286,7 @@ class MainWindow(QMainWindow):
 
     def _refresh_stable_status(self) -> None:
         if self._state == AppState.IDLE:
-            self.progress_widget.set_idle(self._t("status_waiting"))
+            self.progress_widget.set_idle()
         elif self._state == AppState.AUDIO_SELECTED:
             self.progress_widget.set_idle(self._t("status_ready"))
         elif self._state == AppState.COMPLETED:
@@ -296,7 +331,7 @@ class MainWindow(QMainWindow):
         self._current_audio.clear()
         self._last_output_path = None
         self.current_audio_widget.show_empty()
-        self.progress_widget.set_idle(self._t("status_waiting"))
+        self.progress_widget.set_idle()
         self._set_state(AppState.IDLE)
 
     def _update_selected_settings(self, language: str, profile: str) -> None:
@@ -335,14 +370,22 @@ class MainWindow(QMainWindow):
     def _start_recording(self) -> None:
         if not self._is_stable_state():
             return
-        self._show_model_notice_if_needed(recording=True)
         output_dir = self._output_directory()
         if output_dir is None:
             return
+        profile = self._selected_model_profile()
+        model_available = self._model_repository.is_available(profile)
+        if not model_available:
+            QMessageBox.information(
+                self,
+                self._t("recording_model_missing_title"),
+                self._t("recording_model_missing_message", profile=self.settings_widget.profile_combo.currentText()),
+            )
         self._recording_previous_job = self._current_audio.job
         self._recording_previous_output_path = self._last_output_path
         self._live_failed_message = None
         self._live_speed_factor = None
+        self._live_cancel_requested_by_user = False
         self._discard_restore_pending = False
         self._recording_error_handled = False
         self._reset_finalization_progress()
@@ -356,34 +399,43 @@ class MainWindow(QMainWindow):
             self._recording_service.discard()
             QMessageBox.warning(self, self._t("record_failed_title"), self._t("record_buffer_failed"))
             return
-        language_label = self.settings_widget.selected_language()
-        profile_label = self.settings_widget.selected_profile()
-        live_job = TranscriptionJob(
-            input_path=session.path,
-            language_label=language_label,
-            language_code=LANGUAGES.get(language_label),
-            model_profile=ModelProfile.from_label(profile_label),
-            duration=None,
-        )
-        self._live_service = LiveTranscriptionService(live_job, output_dir, buffer)
-        worker = LiveTranscriptionWorker(self._live_service, self)
-        worker.live_status.connect(self._on_live_status)
-        worker.live_confirmed.connect(self._on_live_confirmed)
-        worker.live_metrics.connect(self._on_live_metrics)
-        worker.live_completed.connect(self._on_live_completed)
-        worker.live_failed.connect(self._on_live_failed)
-        worker.live_cancelled.connect(self._on_live_cancelled)
-        worker.finished.connect(lambda worker=worker: self._dispose_live_worker(worker))
-        self._live_worker = worker
+        self._live_service = None
+        self._live_worker = None
+        worker = None
+        if model_available:
+            language_label = self.settings_widget.selected_language()
+            profile_label = self.settings_widget.selected_profile()
+            live_job = TranscriptionJob(
+                input_path=session.path,
+                language_label=language_label,
+                language_code=LANGUAGES.get(language_label),
+                model_profile=ModelProfile.from_label(profile_label),
+                duration=None,
+            )
+            self._live_service = LiveTranscriptionService(live_job, output_dir, buffer)
+            worker = LiveTranscriptionWorker(self._live_service, self)
+            worker.live_status.connect(self._on_live_status)
+            worker.live_confirmed.connect(self._on_live_confirmed)
+            worker.live_metrics.connect(self._on_live_metrics)
+            worker.live_completed.connect(self._on_live_completed)
+            worker.live_failed.connect(self._on_live_failed)
+            worker.live_cancelled.connect(self._on_live_cancelled)
+            worker.finished.connect(lambda worker=worker: self._dispose_live_worker(worker))
+            self._live_worker = worker
         self._last_output_path = None
         self.current_audio_widget.show_recording(session.path)
         self.input_widget.set_recording(True)
         self._recording_started_at = time.monotonic()
         self.input_widget.set_recording_time(0)
         self._record_timer.start()
-        self.progress_widget.set_recording(self._t("status_preparing_live"), self._t("live_starts_around"))
+        if model_available:
+            self.progress_widget.set_recording(self._t("status_preparing_live"), self._t("live_starts_around"))
+        else:
+            self.progress_widget.set_recording(self._t("recording_without_model"), self._t("recording_without_model_detail"))
         self._set_state(AppState.RECORDING)
-        worker.start()
+        if worker is not None:
+            worker.start()
+            self._apply_state()
 
     def _stop_recording(self) -> None:
         if not self._recording_service.is_recording:
@@ -421,6 +473,20 @@ class MainWindow(QMainWindow):
         )
         self.current_audio_widget.show_audio(job.input_path, job.duration, recorded_audio=True)
         self.current_audio_widget.set_state("recorded")
+        if not self._model_repository.is_available(job.model_profile):
+            self.progress_widget.set_idle(self._t("status_recording_saved"), self._t("recording_saved_model_required"))
+            self._recording_service.reset()
+            self._set_state(AppState.AUDIO_SELECTED)
+            return
+        if self._live_cancel_requested_by_user:
+            if self._live_worker and self._live_worker.isRunning():
+                self._live_worker.request_cancel(False)
+            self.progress_widget.set_idle(self._t("live_cancelled_audio_saved"), self._t("live_cancelled_audio_detail"))
+            self._recording_service.reset()
+            self._live_service = None
+            self._set_state(AppState.AUDIO_SELECTED)
+            self._save_settings()
+            return
         if self._live_failed_message:
             self.progress_widget.set_idle(self._t("status_recording_saved"), self._t("live_stopped_press_transcribe"))
             self._recording_service.reset()
@@ -430,6 +496,7 @@ class MainWindow(QMainWindow):
             self._set_state(AppState.FINALIZING_RECORDING)
             self._start_finalization_progress(session.duration)
             self._live_worker.request_finalize(session.duration)
+            self._apply_state()
         else:
             self.progress_widget.set_idle(self._t("status_recording_saved"), self._t("press_transcribe_for_txt"))
             self._recording_service.reset()
@@ -450,6 +517,7 @@ class MainWindow(QMainWindow):
         self._record_timer.stop()
         self._recording_started_at = None
         self._discard_restore_pending = True
+        self._live_cancel_requested_by_user = False
         self._recording_service.discard()
         self.input_widget.set_recording(False)
         self.progress_widget.set_indeterminate(self._t("discarding_recording"), "")
@@ -473,6 +541,10 @@ class MainWindow(QMainWindow):
     def _start_transcription(self) -> None:
         if not self._is_stable_state():
             return
+        selected_profile = self._selected_model_profile()
+        if not self._model_repository.is_available(selected_profile):
+            self._start_model_download(selected_profile)
+            return
         job = self._current_audio.job
         if job is None:
             QMessageBox.information(self, self._t("no_audio_title"), self._t("no_audio_message"))
@@ -481,9 +553,8 @@ class MainWindow(QMainWindow):
             self.settings_widget.selected_language(),
             self.settings_widget.selected_profile(),
         )
-        profile = job.model_profile
-        if not self._model_repository.is_available(profile):
-            self._start_model_download(profile)
+        job = self._current_audio.job
+        if job is None:
             return
         output_dir = self._output_directory()
         if output_dir is None:
@@ -492,6 +563,7 @@ class MainWindow(QMainWindow):
         job.progress = 0
         job.error = None
         self._last_output_path = None
+        self._file_cancel_requested = False
         self._transcription_started_at = None
         self._eta_seconds = None
         self.progress_widget.set_file_progress(0, self._t("remaining_calculating"))
@@ -511,10 +583,15 @@ class MainWindow(QMainWindow):
     def _start_model_download(self, profile: ModelProfile) -> None:
         if self._model_worker is not None and self._model_worker.isRunning():
             return
-        self.progress_widget.set_download_progress(0, self._t("first_time_only"))
+        self._model_cancel_requested = False
+        self.progress_widget.set_indeterminate(
+            self._t("status_preparing_model_download"),
+            self._t("preparing_model_download_detail"),
+        )
         worker = ModelDownloadWorker(profile, self._model_repository, self)
         worker.status_changed.connect(self._on_model_download_status)
         worker.completed.connect(self._on_model_download_completed)
+        worker.cancelled.connect(self._on_model_download_cancelled)
         worker.failed.connect(self._on_model_download_failed)
         worker.finished.connect(lambda worker=worker: self._dispose_model_worker(worker))
         self._model_worker = worker
@@ -531,9 +608,17 @@ class MainWindow(QMainWindow):
             return None
 
     def _on_model_download_status(self, status: str) -> None:
+        if self._model_cancel_requested or self._close_requested:
+            return
+        if status == "MODEL_DOWNLOAD_PREPARING":
+            self.progress_widget.set_indeterminate(
+                self._t("status_preparing_model_download"),
+                self._t("preparing_model_download_detail"),
+            )
+            return
         percent = self._model_download_percent(status)
         if percent is not None:
-            self.progress_widget.set_download_progress(percent, self._t("first_time_only"))
+            self.progress_widget.set_download_progress(percent, self._t("download_saved_for_future"))
             return
         if status == "Cargando modelo":
             self.progress_widget.set_indeterminate(self._t("status_loading_model"), self._t("preparing_transcription"))
@@ -541,33 +626,76 @@ class MainWindow(QMainWindow):
         self.progress_widget.set_indeterminate(self._runtime_message(status), "")
 
     def _on_model_download_completed(self, profile_label: str) -> None:
+        self._model_cancel_requested = False
         self.progress_widget.set_completed(self._t("model_download_completed"), "")
         self._save_settings()
         self._apply_state()
 
+    def _on_model_download_cancelled(self, profile_label: str) -> None:
+        self._model_cancel_requested = False
+        if self._close_requested:
+            return
+        self.progress_widget.set_idle(self._t("model_download_cancelled"), self._t("model_download_resume"))
+        self._save_settings()
+        self._apply_state()
+
     def _on_model_download_failed(self, message: str) -> None:
+        self._model_cancel_requested = False
+        if self._close_requested:
+            return
         self.progress_widget.set_idle(self._t("model_download_failed_title"), "")
         QMessageBox.warning(self, self._t("model_download_failed_title"), self._runtime_message(message))
         self._apply_state()
 
     def _cancel_current(self) -> None:
+        if self._model_worker and self._model_worker.isRunning():
+            if self._model_cancel_requested:
+                return
+            self._model_cancel_requested = True
+            self.progress_widget.set_indeterminate(self._t("status_cancelling_download"), self._t("download_partial_kept"))
+            self._model_worker.request_cancel()
+            self._apply_state()
+            return
         if self._worker and self._worker.isRunning() and self._current_job_id:
-            self.progress_widget.set_indeterminate(self._t("status_cancelling"), self._t("partial_kept"))
-            self.cancel_button.setEnabled(False)
+            if self._file_cancel_requested:
+                return
+            self._file_cancel_requested = True
+            self.progress_widget.set_indeterminate(self._t("status_cancelling"), self._t("cancel_finishing_current_block"))
             self._worker.cancel_current()
+            self._apply_state()
+            return
+        if self._live_worker and self._live_worker.isRunning():
+            if self._live_cancel_requested_by_user:
+                return
+            self._live_cancel_requested_by_user = True
+            if self._recording_service.is_recording:
+                self.progress_widget.set_recording(self._t("status_cancelling_live"), self._t("live_cancelled_recording_detail"))
+            else:
+                self.progress_widget.set_indeterminate(self._t("status_cancelling_live"), self._t("saved_audio_kept"))
+            self._live_worker.request_cancel(False)
+            self._apply_state()
 
     def _on_job_started(self, job_id: str) -> None:
+        self._file_cancel_requested = False
         self._current_job_id = job_id
         self.progress_widget.set_indeterminate(self._t("status_preparing_audio"), "")
         self._apply_state()
 
     def _on_job_status(self, job_id: str, status: str) -> None:
+        if self._file_cancel_requested or self._close_requested:
+            return
         download_percent = self._model_download_percent(status)
         if download_percent is not None:
-            self.progress_widget.set_download_progress(download_percent, self._t("first_time_only"))
+            self.progress_widget.set_download_progress(download_percent, self._t("download_saved_for_future"))
+            return
+        if status == "MODEL_DOWNLOAD_PREPARING":
+            self.progress_widget.set_indeterminate(
+                self._t("status_preparing_model_download"),
+                self._t("preparing_model_download_detail"),
+            )
             return
         if status == "Descargando modelo por primera vez":
-            self.progress_widget.set_indeterminate(self._t("status_downloading_model"), self._t("first_time_only"))
+            self.progress_widget.set_indeterminate(self._t("status_downloading_model"), self._t("download_saved_for_future"))
             return
         if status == "Cargando modelo":
             self.progress_widget.set_indeterminate(self._t("status_loading_model"), self._t("preparing_transcription"))
@@ -586,8 +714,19 @@ class MainWindow(QMainWindow):
         self.progress_widget.set_indeterminate(self._runtime_message(status), "")
 
     def _on_job_progress(self, job_id: str, value: int) -> None:
+        if self._file_cancel_requested or self._close_requested:
+            return
         value = max(0, min(100, int(value)))
+        job = self._current_audio.job
+        duration = job.duration if job is not None else None
         detail = self._t("remaining_calculating")
+        if duration and duration > 0:
+            processed = min(duration, duration * value / 100.0)
+            detail = self._t(
+                "processed_of_total_calculating",
+                processed=self._format_clock(processed),
+                total=self._format_clock(duration),
+            )
         if value >= 2 and value < 100 and self._transcription_started_at is not None:
             elapsed = max(0.1, time.monotonic() - self._transcription_started_at)
             raw_eta = elapsed * (100 - value) / value
@@ -595,7 +734,16 @@ class MainWindow(QMainWindow):
                 self._eta_seconds = raw_eta
             else:
                 self._eta_seconds = self._eta_seconds * 0.72 + raw_eta * 0.28
-            detail = self._t("remaining_approx", remaining=self._format_remaining(self._eta_seconds))
+            if duration and duration > 0:
+                processed = min(duration, duration * value / 100.0)
+                detail = self._t(
+                    "processed_of_total_eta",
+                    processed=self._format_clock(processed),
+                    total=self._format_clock(duration),
+                    remaining=self._format_remaining(self._eta_seconds),
+                )
+            else:
+                detail = self._t("remaining_approx", remaining=self._format_remaining(self._eta_seconds))
         elif value >= 100:
             detail = ""
         self.progress_widget.set_file_progress(value, detail)
@@ -607,6 +755,9 @@ class MainWindow(QMainWindow):
         self._set_state(AppState.COMPLETED)
 
     def _on_job_failed(self, job_id: str, message: str) -> None:
+        self._file_cancel_requested = False
+        if self._close_requested:
+            return
         self.progress_widget.set_idle(self._t("transcription_failed_title"), self._t("partial_kept"))
         self._set_state(AppState.ERROR)
         translated_message = self._runtime_message(message)
@@ -624,22 +775,30 @@ class MainWindow(QMainWindow):
             box.exec()
 
     def _on_job_cancelled(self, job_id: str) -> None:
+        self._file_cancel_requested = False
+        if self._close_requested:
+            return
         self.progress_widget.set_idle(self._t("status_cancelled"), self._t("partial_kept"))
         self._set_state(AppState.CANCELLED)
 
     def _on_file_task_finished(self) -> None:
+        self._file_cancel_requested = False
         self._current_job_id = None
         self._save_settings()
         self._apply_state()
+        self._maybe_finish_close()
 
     def _on_live_status(self, status: str) -> None:
-        if self._discard_restore_pending:
+        if self._discard_restore_pending or self._live_cancel_requested_by_user:
             return
         download_percent = self._model_download_percent(status)
         if self._state == AppState.FINALIZING_RECORDING:
             if download_percent is not None:
                 self._finalization_stage = "downloading"
                 self._finalization_download_percent = download_percent
+            elif status == "MODEL_DOWNLOAD_PREPARING":
+                self._finalization_stage = "downloading"
+                self._finalization_download_percent = None
             elif status == "Descargando modelo por primera vez":
                 self._finalization_stage = "downloading"
                 self._finalization_download_percent = None
@@ -654,7 +813,10 @@ class MainWindow(QMainWindow):
         if not self._recording_service.is_recording:
             return
         if download_percent is not None:
-            self.progress_widget.set_download_progress(download_percent, self._t("first_time_only"))
+            self.progress_widget.set_download_progress(download_percent, self._t("download_saved_for_future"))
+            return
+        if status == "MODEL_DOWNLOAD_PREPARING":
+            self.progress_widget.set_recording(self._t("status_recording"), self._t("preparing_model_download_detail"))
             return
         if status == "Descargando modelo por primera vez":
             self.progress_widget.set_recording(self._t("status_recording"), self._t("downloading_transcription_model"))
@@ -681,7 +843,7 @@ class MainWindow(QMainWindow):
             self._recalculate_finalization_eta(self._finalization_confirmed)
 
     def _on_live_confirmed(self, seconds: float) -> None:
-        if self._discard_restore_pending:
+        if self._discard_restore_pending or self._live_cancel_requested_by_user:
             return
         if self._state == AppState.FINALIZING_RECORDING:
             self._finalization_confirmed = max(self._finalization_confirmed, seconds)
@@ -708,6 +870,8 @@ class MainWindow(QMainWindow):
 
     def _on_live_failed(self, message: str) -> None:
         self._reset_finalization_progress()
+        if self._close_requested:
+            return
         if self._discard_restore_pending:
             if self._live_service is not None:
                 self._live_service.discard_output()
@@ -733,6 +897,23 @@ class MainWindow(QMainWindow):
         self._reset_finalization_progress()
         if self._discard_restore_pending:
             self._restore_after_discard()
+            return
+        if self._close_requested:
+            return
+        if not self._live_cancel_requested_by_user:
+            return
+        self._live_service = None
+        if self._recording_service.is_recording:
+            self.progress_widget.set_recording(
+                self._t("live_cancelled_recording_continues"),
+                self._t("live_cancelled_recording_detail"),
+            )
+            self._set_state(AppState.RECORDING)
+            return
+        self._recording_service.reset()
+        self.progress_widget.set_idle(self._t("live_cancelled_audio_saved"), self._t("live_cancelled_audio_detail"))
+        self._set_state(AppState.AUDIO_SELECTED)
+        self._save_settings()
 
     def _start_finalization_progress(self, duration: float) -> None:
         self._finalization_duration = max(0.0, float(duration))
@@ -822,12 +1003,27 @@ class MainWindow(QMainWindow):
     def _apply_state(self) -> None:
         stable = self._is_stable_state()
         has_audio = self._current_audio.job is not None
+        model_available = self._selected_model_is_available()
+        model_download_active = self._model_worker is not None and self._model_worker.isRunning()
+        file_transcription_active = self._worker is not None and self._worker.isRunning()
+        live_transcription_active = self._live_worker is not None and self._live_worker.isRunning()
         self._refresh_primary_action_text()
         self.input_widget.set_interactions_enabled(stable)
         self.settings_widget.set_interactions_enabled(stable)
         self.language_toggle_button.setEnabled(stable)
-        self.transcribe_button.setEnabled(stable and has_audio)
-        self.cancel_button.setEnabled(self._state == AppState.TRANSCRIBING_FILE and self._worker is not None)
+        self.transcribe_button.setEnabled(stable and (has_audio or not model_available))
+        can_cancel_model = model_download_active and not self._model_cancel_requested
+        can_cancel_file = (
+            file_transcription_active
+            and self._state == AppState.TRANSCRIBING_FILE
+            and not self._file_cancel_requested
+        )
+        can_cancel_live = (
+            live_transcription_active
+            and self._state in {AppState.RECORDING, AppState.RECORDING_TRANSCRIBING, AppState.FINALIZING_RECORDING}
+            and not self._live_cancel_requested_by_user
+        )
+        self.cancel_button.setEnabled(can_cancel_model or can_cancel_file or can_cancel_live)
         self.current_audio_widget.set_remove_available(stable and has_audio)
         self.open_file_button.setEnabled(bool(self._last_output_path and self._last_output_path.exists()))
         self.open_folder_button.setEnabled(bool(self.settings_widget.output_edit.text().strip()))
@@ -895,48 +1091,89 @@ class MainWindow(QMainWindow):
             self._worker = None
         worker.deleteLater()
         self._apply_state()
+        self._maybe_finish_close()
 
     def _dispose_model_worker(self, worker: ModelDownloadWorker) -> None:
         if self._model_worker is worker:
             self._model_worker = None
+        self._model_cancel_requested = False
         worker.deleteLater()
         self._apply_state()
+        self._maybe_finish_close()
 
     def _dispose_live_worker(self, worker: LiveTranscriptionWorker) -> None:
         if self._live_worker is worker:
             self._live_worker = None
         worker.deleteLater()
+        self._apply_state()
+        self._maybe_finish_close()
+
+    def _maybe_finish_close(self) -> None:
+        if not self._close_requested:
+            return
+        if self._recording_service.is_recording:
+            return
+        if self._model_worker is not None and self._model_worker.isRunning():
+            return
+        if self._worker is not None and self._worker.isRunning():
+            return
+        if self._live_worker is not None and self._live_worker.isRunning():
+            return
+        self._allow_close = True
+        QTimer.singleShot(0, self.close)
 
     def closeEvent(self, event) -> None:
-        if self._model_worker is not None and self._model_worker.isRunning():
-            QMessageBox.information(self, self._t("model_download_in_progress_title"), self._t("model_download_in_progress_message"))
+        if self._allow_close:
+            self._save_settings()
+            event.accept()
+            return
+        if self._close_requested:
             event.ignore()
             return
-        active = self._recording_service.is_recording or (self._worker and self._worker.isRunning()) or (self._live_worker and self._live_worker.isRunning())
-        if active:
-            message = self._t("close_recording_message") if self._recording_service.is_recording else self._t("close_process_message")
-            answer = QMessageBox.question(
-                self,
-                self._t("close_app_title"),
-                f"{message}\n\n{self._t('close_question')}",
-                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
-                QMessageBox.StandardButton.No,
-            )
-            if answer != QMessageBox.StandardButton.Yes:
-                event.ignore()
-                return
+        model_active = self._model_worker is not None and self._model_worker.isRunning()
+        file_active = self._worker is not None and self._worker.isRunning()
+        live_active = self._live_worker is not None and self._live_worker.isRunning()
+        recording_active = self._recording_service.is_recording
+        active = model_active or file_active or live_active or recording_active
+        if not active:
+            self._save_settings()
+            event.accept()
+            return
+        if model_active:
+            message = self._t("close_download_message")
+        elif recording_active:
+            message = self._t("close_recording_message")
+        else:
+            message = self._t("close_process_message")
+        answer = QMessageBox.question(
+            self,
+            self._t("close_app_title"),
+            f"{message}\n\n{self._t('close_question')}",
+            QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+            QMessageBox.StandardButton.No,
+        )
+        if answer != QMessageBox.StandardButton.Yes:
+            event.ignore()
+            return
+        self._close_requested = True
         self._record_timer.stop()
         self._finalization_timer.stop()
-        if self._recording_service.is_recording:
+        if recording_active:
             try:
                 self._recording_service.stop()
             except Exception:
                 self._logger.exception("No se pudo cerrar la grabación limpiamente")
-        if self._worker and self._worker.isRunning():
+            self.input_widget.set_recording(False)
+        if model_active and self._model_worker is not None:
+            self._model_cancel_requested = True
+            self._model_worker.request_cancel()
+        if file_active and self._worker is not None:
+            self._file_cancel_requested = True
             self._worker.cancel_current()
-            self._worker.wait(5000)
-        if self._live_worker and self._live_worker.isRunning():
+        if live_active and self._live_worker is not None:
+            self._live_cancel_requested_by_user = True
             self._live_worker.request_cancel(False)
-            self._live_worker.wait(5000)
-        self._save_settings()
-        event.accept()
+        self.progress_widget.set_indeterminate(self._t("status_closing"), self._t("closing_process_detail"))
+        event.ignore()
+        self._maybe_finish_close()
+

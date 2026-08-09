@@ -42,7 +42,7 @@ class LiveTranscriptionWorker(QThread):
                     return
                 force = self._finalize_event.is_set()
                 started_at = time.monotonic()
-                result = self._service.process_available(force, self.live_status.emit)
+                result = self._service.process_available(force, self.live_status.emit, self._cancel_event)
                 processing_seconds = max(0.0, time.monotonic() - started_at)
                 if result is not None:
                     audio_seconds = max(0.2, result.end_seconds - result.start_seconds)
@@ -55,6 +55,6 @@ class LiveTranscriptionWorker(QThread):
                     self.live_completed.emit(str(path))
                     return
                 if result is None:
-                    time.sleep(0.2)
+                    self._cancel_event.wait(0.2)
         except Exception as exc:
             self.live_failed.emit(str(exc))

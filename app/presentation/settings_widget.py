@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QPointF, Qt, Signal
 from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QComboBox, QFileDialog, QGridLayout, QHBoxLayout, QLabel, QLineEdit, QPushButton, QWidget
 
@@ -14,14 +14,30 @@ class ChevronComboBox(QComboBox):
         super().paintEvent(event)
         painter = QPainter(self)
         painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
-        color = QColor("#cfd3da" if self.isEnabled() else "#5f646d")
+        color = QColor("#5f646d" if not self.isEnabled() else ("#ffffff" if self.underMouse() else "#cfd3da"))
         pen = QPen(color, 1.6)
         pen.setCapStyle(Qt.PenCapStyle.RoundCap)
         painter.setPen(pen)
-        center_x = self.width() - 13
-        center_y = self.height() // 2
-        painter.drawLine(center_x - 4, center_y - 2, center_x, center_y + 2)
-        painter.drawLine(center_x, center_y + 2, center_x + 4, center_y - 2)
+        drop_width = 27.0
+        center_x = self.width() - (drop_width / 2.0)
+        center_y = self.height() / 2.0
+        painter.drawLine(QPointF(center_x - 4.0, center_y - 2.0), QPointF(center_x, center_y + 2.0))
+        painter.drawLine(QPointF(center_x, center_y + 2.0), QPointF(center_x + 4.0, center_y - 2.0))
+
+
+class CenteredDotsButton(QPushButton):
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        color = QColor("#5f646d" if not self.isEnabled() else ("#ffffff" if self.underMouse() else "#cfd3da"))
+        pen = QPen(color, 2.2)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        center_x = self.width() / 2.0
+        center_y = self.height() / 2.0
+        for offset in (-4.0, 0.0, 4.0):
+            painter.drawPoint(QPointF(center_x + offset, center_y))
 
 
 class SettingsWidget(QWidget):
@@ -45,8 +61,9 @@ class SettingsWidget(QWidget):
         self.profile_combo = ChevronComboBox()
         self.profile_hint = QLabel()
         self.profile_hint.setObjectName("modelHintLabel")
+        self.profile_hint.setAlignment(Qt.AlignmentFlag.AlignHCenter | Qt.AlignmentFlag.AlignVCenter)
         self.output_edit = QLineEdit(output_dir)
-        self.output_button = QPushButton("…")
+        self.output_button = CenteredDotsButton()
         self.output_button.setObjectName("browseButton")
         self.output_button.setFixedWidth(36)
         self.output_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)

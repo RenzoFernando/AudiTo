@@ -31,6 +31,8 @@ class TranscriptionService:
         progress_callback: Callable[[int], None],
         status_callback: Callable[[str], None],
     ) -> TranscriptionResult:
+        if cancel_event.is_set():
+            raise TranscriptionCancelled("Transcripción cancelada")
         final_path = self._exporter.unique_output_path(output_dir, job.input_path)
         job.output_path = final_path
         status_callback("Preparando audio")
@@ -40,12 +42,16 @@ class TranscriptionService:
         filtered_count = 0
         detected_language = None
         try:
+            if cancel_event.is_set():
+                raise TranscriptionCancelled("Transcripción cancelada")
             segments, detected_language = self._engine.transcribe(
                 job.input_path,
                 job.model_profile,
                 job.language_code,
                 status_callback,
             )
+            if cancel_event.is_set():
+                raise TranscriptionCancelled("Transcripción cancelada")
             for segment in segments:
                 if cancel_event.is_set():
                     raise TranscriptionCancelled("Transcripción cancelada")

@@ -23,7 +23,7 @@ class FakeLiveEngine:
         if self.calls == 1:
             return iter([
                 TranscriptionSegment(1.0, 3.0, "Inicio de la clase"),
-                TranscriptionSegment(27.8, 30.0, "integración continua"),
+                TranscriptionSegment(57.8, 60.0, "integración continua"),
             ]), "es"
         return iter([
             TranscriptionSegment(0.3, 2.5, "integración continua"),
@@ -38,7 +38,7 @@ class LiveTranscriptionServiceTests(unittest.TestCase):
             output = root / "out"
             recording = output / "Grabaciones" / "Grabacion.wav"
             buffer = LiveAudioBuffer(sample_rate=10, channels=1, sample_width=2, max_seconds=300)
-            buffer.append(b"\x01\x00" * 300)
+            buffer.append(b"\x01\x00" * 600)
             job = TranscriptionJob(recording, "Español", "es", ModelProfile.BALANCED)
             engine = FakeLiveEngine()
             with patch.object(AppPaths, "temp_dir", return_value=root / "temp"):
@@ -46,13 +46,13 @@ class LiveTranscriptionServiceTests(unittest.TestCase):
                 service = LiveTranscriptionService(job, output, buffer, engine=engine)
                 first = service.process_available(False, lambda value: None)
                 self.assertIsNotNone(first)
-                buffer.append(b"\x01\x00" * 300)
+                buffer.append(b"\x01\x00" * 600)
                 second = service.process_available(False, lambda value: None)
                 self.assertIsNotNone(second)
-                final = service.finish(60.0)
+                final = service.finish(120.0)
             text = final.read_text(encoding="utf-8")
             self.assertEqual(text.count("integración continua"), 1)
-            self.assertIn("[00:00:31]", text)
+            self.assertIn("[00:01:01]", text)
             self.assertIn("Ahora veamos el pipeline", text)
 
 

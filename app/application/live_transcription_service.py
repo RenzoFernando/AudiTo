@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+import threading
 import uuid
 from collections.abc import Callable
 from dataclasses import dataclass
@@ -61,7 +62,14 @@ class LiveTranscriptionService:
     def confirmed_until(self) -> float:
         return self._confirmed_until
 
-    def process_available(self, force: bool, status_callback: Callable[[str], None]) -> LiveProcessResult | None:
+    def process_available(
+        self,
+        force: bool,
+        status_callback: Callable[[str], None],
+        cancel_event: threading.Event | None = None,
+    ) -> LiveProcessResult | None:
+        if cancel_event is not None and cancel_event.is_set():
+            return None
         available_end = self._buffer.end_seconds
         pending = available_end - self._confirmed_until
         threshold = LIVE_INITIAL_SECONDS if self._confirmed_until <= 0 else LIVE_CHUNK_SECONDS
@@ -78,15 +86,21 @@ class LiveTranscriptionService:
         temporary = AppPaths.temp_dir() / f"live_{uuid.uuid4().hex}.wav"
         try:
             snapshot.write_wav(temporary)
+            if cancel_event is not None and cancel_event.is_set():
+                return None
             segments, detected_language = self._engine.transcribe(
                 temporary,
                 self._job.model_profile,
                 self._job.language_code,
                 status_callback,
             )
+            if cancel_event is not None and cancel_event.is_set():
+                return None
             guard = TranscriptionGuard()
             cleaned_segments: list[TranscriptionSegment] = []
             for segment in segments:
+                if cancel_event is not None and cancel_event.is_set():
+                    return None
                 text = guard.clean_segment(segment.text)
                 if not text:
                     self._logger.warning("Segmento repetitivo descartado en vivo: start=%.2f end=%.2f", segment.start + snapshot.start_seconds, segment.end + snapshot.start_seconds)
@@ -98,6 +112,8 @@ class LiveTranscriptionService:
                         guard.finalize_segment(text),
                     )
                 )
+            if cancel_event is not None and cancel_event.is_set():
+                return None
             merged = self._merge_service.merge(
                 self._confirmed_tail,
                 cleaned_segments,

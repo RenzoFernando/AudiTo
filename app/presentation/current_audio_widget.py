@@ -2,10 +2,27 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from PySide6.QtCore import Qt, Signal
+from PySide6.QtCore import QPointF, Qt, Signal
+from PySide6.QtGui import QColor, QPainter, QPen
 from PySide6.QtWidgets import QFrame, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QVBoxLayout
 
 from app.presentation.translations import tr
+
+
+class CenteredCloseButton(QPushButton):
+    def paintEvent(self, event) -> None:
+        super().paintEvent(event)
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.RenderHint.Antialiasing, True)
+        color = QColor("#5f646d" if not self.isEnabled() else ("#ffffff" if self.underMouse() else "#8f959e"))
+        pen = QPen(color, 1.5)
+        pen.setCapStyle(Qt.PenCapStyle.RoundCap)
+        painter.setPen(pen)
+        center_x = self.width() / 2.0
+        center_y = self.height() / 2.0
+        radius = 3.2
+        painter.drawLine(QPointF(center_x - radius, center_y - radius), QPointF(center_x + radius, center_y + radius))
+        painter.drawLine(QPointF(center_x + radius, center_y - radius), QPointF(center_x - radius, center_y + radius))
 
 
 class CurrentAudioWidget(QFrame):
@@ -37,7 +54,7 @@ class CurrentAudioWidget(QFrame):
         self.meta_label.setObjectName("fileMetaLabel")
         text_layout.addWidget(self.name_label)
         text_layout.addWidget(self.meta_label)
-        self.remove_button = QPushButton("×")
+        self.remove_button = CenteredCloseButton()
         self.remove_button.setObjectName("removeAudioButton")
         self.remove_button.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.remove_button.setVisible(False)
