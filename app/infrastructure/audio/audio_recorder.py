@@ -9,6 +9,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from pathlib import Path
 
+from app.infrastructure.system.app_paths import AppPaths
+
 
 class AudioRecordingError(RuntimeError):
     pass
@@ -66,7 +68,8 @@ class AudioRecorder:
         except ImportError as exc:
             raise AudioRecordingError("Falta el componente de grabación. Reinicia AudiTo para instalarlo.") from exc
 
-        recordings_dir = output_dir / "Grabaciones"
+        default_output_dir = AppPaths.transcriptions_dir()
+        recordings_dir = AppPaths.recordings_dir() if output_dir.resolve() == default_output_dir.resolve() else output_dir / "Grabaciones"
         recordings_dir.mkdir(parents=True, exist_ok=True)
         self._path = self._unique_recording_path(recordings_dir)
         try:

@@ -15,12 +15,16 @@ def _project_root() -> Path:
 
 
 def _prepare_environment() -> None:
+    from app.infrastructure.system.app_paths import AppPaths
+
     os.environ.setdefault("HF_HUB_DISABLE_SYMLINKS_WARNING", "1")
     os.environ.setdefault("HF_HUB_DISABLE_TELEMETRY", "1")
+    os.environ.setdefault("HF_HOME", str(AppPaths.huggingface_cache_dir()))
+    os.environ.setdefault("HF_HUB_CACHE", str(AppPaths.huggingface_cache_dir() / "hub"))
 
 
 def _ensure_dependencies() -> None:
-    if getattr(sys, "frozen", False):
+    if getattr(sys, "frozen", False) or "__compiled__" in globals():
         return
     required = ("PySide6", "faster_whisper", "sounddevice", "huggingface_hub")
     missing = [module for module in required if importlib.util.find_spec(module) is None]
@@ -44,6 +48,7 @@ def main() -> int:
     from PySide6.QtCore import Qt
     from PySide6.QtGui import QIcon
     from PySide6.QtWidgets import QApplication
+    from app.app_meta import APP_COMPANY_NAME
     from app.constants import APP_NAME
     from app.infrastructure.logging_setup import configure_logging
     from app.infrastructure.system.app_paths import AppPaths
@@ -52,7 +57,7 @@ def main() -> int:
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     application = QApplication(sys.argv)
     application.setApplicationName(APP_NAME)
-    application.setOrganizationName(APP_NAME)
+    application.setOrganizationName(APP_COMPANY_NAME)
     application.setStyle("Fusion")
     AppPaths.cleanup_temp()
     configure_logging()

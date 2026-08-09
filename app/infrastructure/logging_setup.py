@@ -8,7 +8,7 @@ from app.infrastructure.system.app_paths import AppPaths
 
 
 def configure_logging() -> None:
-    log_path = AppPaths.logs_dir() / "app.log"
+    log_path = AppPaths.error_log_file()
     handler = RotatingFileHandler(log_path, maxBytes=2_000_000, backupCount=3, encoding="utf-8")
     formatter = logging.Formatter("%(asctime)s | %(levelname)s | %(name)s | %(message)s")
     handler.setFormatter(formatter)
