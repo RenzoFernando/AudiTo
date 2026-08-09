@@ -1,3 +1,4 @@
+
 @echo off
 setlocal EnableExtensions
 cd /d "%~dp0"
@@ -33,6 +34,7 @@ if errorlevel 1 goto meta_error
 "%PYTHON_CMD%" build_version_info.py "%VERSION_FILE%"
 if errorlevel 1 goto version_error
 if not exist "%ICON_FILE%" goto icon_error
+if not exist "%LICENSE_FILE%" goto license_error
 if not exist "%SPEC_DIR%" mkdir "%SPEC_DIR%"
 if not exist "%OUTPUT_FOLDER%" mkdir "%OUTPUT_FOLDER%"
 if exist "%OUTPUT_FOLDER%\%PORTABLE_ARTIFACT_NAME%" del /q "%OUTPUT_FOLDER%\%PORTABLE_ARTIFACT_NAME%"
@@ -45,6 +47,7 @@ if exist "%OUTPUT_FOLDER%\%PORTABLE_ARTIFACT_NAME%" del /q "%OUTPUT_FOLDER%\%POR
     --icon "%PROJECT_ROOT%\%ICON_FILE%" ^
     --version-file "%PROJECT_ROOT%\%VERSION_FILE%" ^
     --add-data "%PROJECT_ROOT%\%ASSETS_FOLDER%;assets" ^
+    --add-data "%PROJECT_ROOT%\%LICENSE_FILE%;." ^
     --collect-all av ^
     --collect-all ctranslate2 ^
     --collect-all faster_whisper ^
@@ -87,9 +90,14 @@ goto cleanup_fail
 :icon_error
 echo ERROR: No se encontro el icono %ICON_FILE%.
 goto cleanup_fail
+:license_error
+echo ERROR: No se encontro el archivo de licencia %LICENSE_FILE%.
+goto cleanup_fail
 :fail
 echo ERROR: La compilacion portable fallo.
 :cleanup_fail
 call :cleanup_build
 pause
 exit /b 1
+
+

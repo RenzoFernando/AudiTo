@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 from app import app_meta
@@ -17,6 +18,7 @@ VALUES = {
     "COPYRIGHT_TEXT": app_meta.APP_LEGAL_COPYRIGHT,
     "TRADEMARK_TEXT": app_meta.APP_TRADEMARK,
     "PORTABLE_ARTIFACT_NAME": app_meta.APP_PORTABLE_ARTIFACT_NAME,
+    "LICENSE_FILE": app_meta.APP_LICENSE_RELATIVE_PATH,
     "INSTALLER_NAME": app_meta.APP_INSTALLER_NAME,
     "INSTALLER_BASENAME": app_meta.APP_INSTALLER_BASENAME,
     "PUBLISHER_URL": app_meta.APP_PUBLISHER_URL,
@@ -29,3 +31,5 @@ VALUES = {
 for key, value in VALUES.items():
     text = str(value).replace('"', '')
     print(f'set "{key}={text}"')
+
+

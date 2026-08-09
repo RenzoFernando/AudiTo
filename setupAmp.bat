@@ -6,6 +6,38 @@ set "VENV_DIR=.venv"
 set "REQ=requirements.txt"
 set "PY_CMD="
 set "VENV_PY=%VENV_DIR%\Scripts\python.exe"
+goto :main
+
+:trypy
+set "candidate=%*"
+%candidate% --version >nul 2>&1
+if not errorlevel 1 if not defined PY_CMD set "PY_CMD=%candidate%"
+exit /b 0
+
+:cleanup_crash_reports
+del /q "%PROJECT_ROOT%\NuGetCrashReport*" >nul 2>&1
+for /d %%D in ("%PROJECT_ROOT%\NuGetCrashReport*") do rmdir /s /q "%%~fD" >nul 2>&1
+del /q "%TEMP%\NuGetCrashReport*" >nul 2>&1
+for /d %%D in ("%TEMP%\NuGetCrashReport*") do rmdir /s /q "%%~fD" >nul 2>&1
+exit /b 0
+
+:py_fail
+call :cleanup_crash_reports
+echo.
+echo ERROR: Instala Python 3.11 o 3.12 y vuelve a ejecutar este archivo.
+echo.
+pause
+exit /b 1
+
+:fail
+call :cleanup_crash_reports
+echo.
+echo ERROR: No fue posible preparar el entorno.
+echo.
+pause
+exit /b 1
+
+:main
 call :cleanup_crash_reports
 echo.
 echo =======================================================
@@ -37,28 +69,3 @@ echo Ejecuta buildinstaller.bat para el instalador.
 echo.
 pause
 exit /b 0
-:trypy
-set "candidate=%*"
-%candidate% --version >nul 2>&1
-if not errorlevel 1 if not defined PY_CMD set "PY_CMD=%candidate%"
-goto :eof
-:cleanup_crash_reports
-del /q "%PROJECT_ROOT%\NuGetCrashReport*" >nul 2>&1
-for /d %%D in ("%PROJECT_ROOT%\NuGetCrashReport*") do rmdir /s /q "%%~fD" >nul 2>&1
-del /q "%TEMP%\NuGetCrashReport*" >nul 2>&1
-for /d %%D in ("%TEMP%\NuGetCrashReport*") do rmdir /s /q "%%~fD" >nul 2>&1
-goto :eof
-:py_fail
-call :cleanup_crash_reports
-echo.
-echo ERROR: Instala Python 3.11 o 3.12 y vuelve a ejecutar este archivo.
-echo.
-pause
-exit /b 1
-:fail
-call :cleanup_crash_reports
-echo.
-echo ERROR: No fue posible preparar el entorno.
-echo.
-pause
-exit /b 1

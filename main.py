@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import importlib.util
@@ -46,9 +47,9 @@ def _ensure_dependencies() -> None:
 def main() -> int:
     _prepare_environment()
     _ensure_dependencies()
-    from PySide6.QtCore import Qt
-    from PySide6.QtGui import QIcon
-    from PySide6.QtWidgets import QApplication
+    from PySide6.QtCore import QEvent, QObject, QTimer, Qt
+    from PySide6.QtGui import QCursor, QIcon
+    from PySide6.QtWidgets import QApplication, QDialog
     from app.app_meta import APP_COMPANY_NAME
     from app.constants import APP_NAME
     from app.infrastructure.system.app_paths import AppPaths
@@ -56,6 +57,38 @@ def main() -> int:
 
     QApplication.setHighDpiScaleFactorRoundingPolicy(Qt.HighDpiScaleFactorRoundingPolicy.PassThrough)
     application = QApplication(sys.argv)
+
+    def center_window(widget) -> None:
+        try:
+            parent = widget.parentWidget()
+            if parent is not None and parent.isVisible():
+                screen = parent.screen()
+                target_center = parent.frameGeometry().center()
+            else:
+                screen = application.screenAt(QCursor.pos()) or application.primaryScreen()
+                if screen is None:
+                    return
+                target_center = screen.availableGeometry().center()
+            frame = widget.frameGeometry()
+            frame.moveCenter(target_center)
+            if screen is not None:
+                available = screen.availableGeometry()
+                x = max(available.left(), min(frame.left(), available.right() - frame.width() + 1))
+                y = max(available.top(), min(frame.top(), available.bottom() - frame.height() + 1))
+                widget.move(x, y)
+            else:
+                widget.move(frame.topLeft())
+        except RuntimeError:
+            return
+
+    class DialogCenterFilter(QObject):
+        def eventFilter(self, watched, event) -> bool:
+            if event.type() == QEvent.Type.Show and isinstance(watched, QDialog):
+                QTimer.singleShot(0, lambda target=watched: center_window(target))
+            return super().eventFilter(watched, event)
+
+    dialog_center_filter = DialogCenterFilter(application)
+    application.installEventFilter(dialog_center_filter)
     application.setApplicationName(APP_NAME)
     application.setOrganizationName(APP_COMPANY_NAME)
     application.setStyle("Fusion")
@@ -65,9 +98,13 @@ def main() -> int:
     if icon_path.exists():
         application.setWindowIcon(QIcon(str(icon_path)))
     window = MainWindow()
+    center_window(window)
     window.show()
+    QTimer.singleShot(0, lambda: center_window(window))
     return application.exec()
 
 
 if __name__ == "__main__":
     raise SystemExit(main())
+
+

@@ -3,84 +3,162 @@
 <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <meta name="description" content="AudiTo convierte audio en texto localmente en Windows con Whisper.">
+    <meta name="description" content="AudiTo convierte audio y grabaciones en texto local con Faster-Whisper.">
+    <meta name="theme-color" content="#0f1115">
     <title>AudiTo · Audio a texto local</title>
+    <link rel="icon" href="assets/icon.png">
     <link rel="stylesheet" href="web/styles.css">
 </head>
 <body>
     <header class="topbar">
-        <a class="brand" href="#inicio">AudiTo</a>
+        <a class="brand" href="#inicio" aria-label="AudiTo, volver al inicio">
+            <img src="assets/icon.png" alt="">
+            <span>AudiTo</span>
+        </a>
         <nav aria-label="Navegación principal">
-            <a href="#inicio">Inicio</a>
-            <a href="#como-funciona">Cómo funciona</a>
+            <a href="#funciones">Funciones</a>
             <a href="#descargar">Descargar</a>
+            <a href="https://github.com/RenzoFernando/AudiTo" target="_blank" rel="noreferrer">GitHub</a>
         </nav>
     </header>
 
     <main>
         <section class="hero" id="inicio">
             <div class="hero-copy">
-                <p class="eyebrow">TRANSCRIPCIÓN LOCAL PARA WINDOWS</p>
-                <h1>Convierte audio en texto.<br>Directamente en tu computador.</h1>
-                <p class="lead">Carga un archivo o graba desde tu micrófono. AudiTo genera una transcripción TXT con marcas de tiempo utilizando Whisper de forma local.</p>
-                <a class="button primary" href="#descargar">DESCARGAR</a>
+                <div class="release-line">
+                    <span class="release-dot"></span>
+                    <span id="release-status">GitHub Releases</span>
+                    <span id="release-version"></span>
+                </div>
+                <h1>Del audio al texto.<br><span>Sin salir de tu computador.</span></h1>
+                <p class="lead">Carga un archivo o graba desde tu micrófono. AudiTo transcribe localmente, conserva marcas de tiempo y guarda el resultado en TXT.</p>
+                <div class="hero-actions">
+                    <a class="button primary release-download" id="hero-installer-link" href="https://github.com/RenzoFernando/AudiTo/releases/latest/download/AudiTo-Setup.exe">Descargar AudiTo</a>
+                    <a class="button secondary release-download" id="hero-portable-link" href="https://github.com/RenzoFernando/AudiTo/releases/latest/download/AudiTo-Portable.exe">Portable</a>
+                </div>
+                <div class="hero-links">
+                    <a href="https://github.com/RenzoFernando/AudiTo" target="_blank" rel="noreferrer">Repositorio de AudiTo</a>
+                    <span>·</span>
+                    <a href="https://github.com/RenzoFernando" target="_blank" rel="noreferrer">Git del creador</a>
+                </div>
             </div>
-            <div class="app-preview" aria-label="Vista de AudiTo">
-                <div class="preview-brand"><span></span><strong>AudiTo</strong><span></span></div>
-                <div class="preview-drop">
+
+            <div class="app-preview" aria-label="Vista simplificada de AudiTo">
+                <div class="preview-title">
+                    <span></span>
+                    <strong>AudiTo</strong>
+                    <span></span>
+                </div>
+                <div class="preview-input">
                     <strong>Arrastra un audio aquí</strong>
                     <small>o selecciona un archivo o graba con tu micrófono</small>
-                    <div><b>Seleccionar audio</b><b>Grabar</b></div>
+                    <div class="preview-input-actions">
+                        <b>Seleccionar audio</b>
+                        <b>Grabar</b>
+                    </div>
                 </div>
-                <div class="preview-file"><i>●</i><div><strong>Ningún audio seleccionado</strong><small>Selecciona, arrastra o graba un audio</small></div></div>
-                <div class="preview-settings"><div><small>Idioma</small><b>Español⌄</b></div><div><small>Precisión</small><b>Equilibrada⌄</b></div></div>
-                <div class="preview-output"><small>Guardar en</small><b>C:\...\Transcripciones</b></div>
-                <div class="preview-status"><span>Listo</span><i></i></div>
-                <div class="preview-primary">TRANSCRIBIR</div>
+                <div class="preview-current">
+                    <i></i>
+                    <div>
+                        <strong>Audio listo</strong>
+                        <small>Un archivo a la vez</small>
+                    </div>
+                </div>
+                <div class="preview-settings">
+                    <div><small>Idioma</small><b>Español</b></div>
+                    <div><small>Precisión</small><b>Equilibrada</b></div>
+                </div>
+                <div class="preview-output"><small>Guardar en</small><b>Transcripciones</b></div>
+                <div class="preview-progress"><span>Listo</span><small>0%</small></div>
+                <div class="preview-bar"><span></span></div>
+                <div class="preview-main-action">TRANSCRIBIR</div>
+                <div class="preview-bottom-actions"><span>Abrir transcripción</span><span>Abrir carpeta</span><span>ES</span></div>
             </div>
         </section>
 
-        <section class="section" id="como-funciona">
+        <section class="section" id="funciones">
             <div class="section-heading">
-                <p class="eyebrow">CÓMO FUNCIONA</p>
-                <h2>Tres pasos y listo.</h2>
+                <p class="eyebrow">LO ESENCIAL</p>
+                <h2>Una herramienta directa para transcribir.</h2>
             </div>
-            <div class="steps">
-                <article><span>01</span><h3>Carga o graba</h3><p>Selecciona un audio existente o utiliza el micrófono.</p></article>
-                <article><span>02</span><h3>AudiTo transcribe</h3><p>Whisper procesa el audio localmente en tu computador.</p></article>
-                <article><span>03</span><h3>Obtén tu TXT</h3><p>Recibe texto legible con marcas de tiempo automáticas.</p></article>
+            <div class="feature-grid">
+                <article>
+                    <span>01</span>
+                    <h3>Archivos y micrófono</h3>
+                    <p>Selecciona, arrastra o graba audio desde la misma interfaz.</p>
+                </article>
+                <article>
+                    <span>02</span>
+                    <h3>Procesamiento local</h3>
+                    <p>Faster-Whisper procesa el audio en tu equipo después de descargar el modelo.</p>
+                </article>
+                <article>
+                    <span>03</span>
+                    <h3>Tres perfiles</h3>
+                    <p>Rápida, Equilibrada y Máxima para elegir entre consumo, velocidad y precisión.</p>
+                </article>
+                <article>
+                    <span>04</span>
+                    <h3>Español, inglés o automático</h3>
+                    <p>El idioma de transcripción se controla independientemente del idioma de la interfaz.</p>
+                </article>
+                <article>
+                    <span>05</span>
+                    <h3>Grabación progresiva</h3>
+                    <p>En grabaciones largas, AudiTo puede procesar nuevos fragmentos mientras continúas hablando.</p>
+                </article>
+                <article>
+                    <span>06</span>
+                    <h3>TXT con marcas de tiempo</h3>
+                    <p>Obtén un archivo legible y abre el resultado o su carpeta desde la aplicación.</p>
+                </article>
             </div>
         </section>
 
-        <section class="section" id="caracteristicas">
+        <section class="local-section">
+            <p class="eyebrow">LOCAL POR DISEÑO</p>
+            <h2>Descarga el modelo una vez. Úsalo después sin depender de una API por minuto.</h2>
+            <p>Los modelos se conservan en los datos locales de AudiTo. La descarga puede cancelarse desde la aplicación y volver a iniciarse más adelante.</p>
+        </section>
+
+        <section class="download-section" id="descargar">
             <div class="section-heading">
-                <p class="eyebrow">CARACTERÍSTICAS</p>
-                <h2>Solo lo necesario.</h2>
+                <p class="eyebrow">DESCARGAR</p>
+                <h2>Elige cómo quieres usar AudiTo.</h2>
+                <p id="download-status">Los botones apuntan siempre a los artefactos de la última release publicada.</p>
             </div>
-            <div class="features">
-                <article><h3>Procesamiento local</h3><p>El audio se procesa en tu equipo.</p></article>
-                <article><h3>Grabación directa</h3><p>Graba y transcribe progresivamente.</p></article>
-                <article><h3>Timestamps automáticos</h3><p>El TXT conserva referencias de tiempo.</p></article>
-                <article><h3>Varios formatos</h3><p>MP3, M4A, WAV, FLAC, AAC y más.</p></article>
-                <article><h3>Tres perfiles</h3><p>Rápida, Equilibrada y Máxima.</p></article>
-                <article><h3>Sin pago por minuto</h3><p>No depende de una API de transcripción.</p></article>
+            <div class="download-grid">
+                <article class="download-card recommended">
+                    <div class="download-head">
+                        <span>RECOMENDADO</span>
+                        <strong>Instalable</strong>
+                    </div>
+                    <p>Instala AudiTo, crea sus accesos y mantiene una integración más natural con el sistema.</p>
+                    <code>AudiTo-Setup.exe</code>
+                    <a class="button primary release-download" id="installer-download-link" href="https://github.com/RenzoFernando/AudiTo/releases/latest/download/AudiTo-Setup.exe">Descargar instalable</a>
+                </article>
+                <article class="download-card">
+                    <div class="download-head">
+                        <span>DIRECTO</span>
+                        <strong>Portable</strong>
+                    </div>
+                    <p>Ejecuta AudiTo directamente sin pasar por un proceso de instalación.</p>
+                    <code>AudiTo-Portable.exe</code>
+                    <a class="button secondary release-download" id="portable-download-link" href="https://github.com/RenzoFernando/AudiTo/releases/latest/download/AudiTo-Portable.exe">Descargar portable</a>
+                </article>
             </div>
-        </section>
-
-        <section class="privacy">
-            <p class="eyebrow">PRIVACIDAD</p>
-            <h2>Tus audios se procesan en tu computador.</h2>
-            <p>AudiTo utiliza Faster-Whisper localmente. Una vez descargado el modelo que elijas, puedes transcribir sin conexión.</p>
-        </section>
-
-        <section class="download" id="descargar">
-            <p class="eyebrow">WINDOWS</p>
-            <h2>Descarga AudiTo.</h2>
-            <p>La descarga del ejecutable se habilitará aquí cuando se publique la versión empaquetada.</p>
-            <span class="button disabled" aria-disabled="true">DESCARGA PRÓXIMAMENTE</span>
+            <div class="release-actions">
+                <a href="https://github.com/RenzoFernando/AudiTo/releases/latest" target="_blank" rel="noreferrer">Ver última release</a>
+                <a href="https://github.com/RenzoFernando/AudiTo" target="_blank" rel="noreferrer">Ver repositorio</a>
+            </div>
         </section>
     </main>
 
-    <footer>Copyright © 2026 · Renzo Fernando Mosquera Daza</footer>
+    <footer>
+        <span>AudiTo · MIT License · 2026</span>
+        <a href="https://github.com/RenzoFernando" target="_blank" rel="noreferrer">Renzo Fernando Mosquera Daza</a>
+    </footer>
+
+    <script src="web/app.js"></script>
 </body>
 </html>

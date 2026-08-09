@@ -1,3 +1,4 @@
+
 @echo off
 setlocal EnableExtensions
 cd /d "%~dp0"
@@ -37,6 +38,7 @@ if errorlevel 1 goto meta_error
 "%PYTHON_CMD%" build_version_info.py "%VERSION_FILE%"
 if errorlevel 1 goto version_error
 if not exist "%ICON_FILE%" goto icon_error
+if not exist "%LICENSE_FILE%" goto license_error
 if not exist "%STAGE_DIR%" mkdir "%STAGE_DIR%"
 if not exist "%SPEC_DIR%" mkdir "%SPEC_DIR%"
 if not exist "%OUTPUT_FOLDER%" mkdir "%OUTPUT_FOLDER%"
@@ -50,6 +52,7 @@ if exist "%OUTPUT_FOLDER%\%INSTALLER_NAME%" del /q "%OUTPUT_FOLDER%\%INSTALLER_N
     --icon "%PROJECT_ROOT%\%ICON_FILE%" ^
     --version-file "%PROJECT_ROOT%\%VERSION_FILE%" ^
     --add-data "%PROJECT_ROOT%\%ASSETS_FOLDER%;assets" ^
+    --add-data "%PROJECT_ROOT%\%LICENSE_FILE%;." ^
     --collect-all av ^
     --collect-all ctranslate2 ^
     --collect-all faster_whisper ^
@@ -80,6 +83,7 @@ if not defined ISCC_CMD goto iscc_error
 >> "%INSTALLER_SCRIPT%" echo OutputDir=%OUTPUT_FOLDER%
 >> "%INSTALLER_SCRIPT%" echo OutputBaseFilename=%INSTALLER_BASENAME%
 >> "%INSTALLER_SCRIPT%" echo SetupIconFile=%ICON_FILE%
+>> "%INSTALLER_SCRIPT%" echo LicenseFile=%LICENSE_FILE%
 >> "%INSTALLER_SCRIPT%" echo UninstallDisplayIcon={app}\%APP_EXE_NAME%
 >> "%INSTALLER_SCRIPT%" echo Compression=lzma2
 >> "%INSTALLER_SCRIPT%" echo SolidCompression=yes
@@ -101,6 +105,7 @@ if not defined ISCC_CMD goto iscc_error
 >> "%INSTALLER_SCRIPT%" echo [Files]
 >> "%INSTALLER_SCRIPT%" echo Source: "%STAGE_DIR%\%APP_EXE_NAME%"; DestDir: "{app}"; Flags: ignoreversion
 >> "%INSTALLER_SCRIPT%" echo Source: "%STAGE_DIR%\%INSTALL_MARKER_FILE%"; DestDir: "{app}"; Flags: ignoreversion
+>> "%INSTALLER_SCRIPT%" echo Source: "%LICENSE_FILE%"; DestDir: "{app}"; Flags: ignoreversion
 >> "%INSTALLER_SCRIPT%" echo.
 >> "%INSTALLER_SCRIPT%" echo [Icons]
 >> "%INSTALLER_SCRIPT%" echo Name: "{autodesktop}\%PRODUCT_NAME%"; Filename: "{app}\%APP_EXE_NAME%"; WorkingDir: "{app}"; IconFilename: "{app}\%APP_EXE_NAME%"; Tasks: desktopicon
@@ -163,6 +168,9 @@ goto cleanup_fail
 :icon_error
 echo ERROR: No se encontro el icono %ICON_FILE%.
 goto cleanup_fail
+:license_error
+echo ERROR: No se encontro el archivo de licencia %LICENSE_FILE%.
+goto cleanup_fail
 :iscc_error
 echo ERROR: No se encontro Inno Setup 6 y no fue posible instalarlo automaticamente. Instala Inno Setup 6 o define ISCC_PATH.
 goto cleanup_fail
@@ -172,3 +180,5 @@ echo ERROR: La generacion del instalador fallo.
 call :cleanup_build
 pause
 exit /b 1
+
+

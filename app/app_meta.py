@@ -1,3 +1,4 @@
+
 from __future__ import annotations
 
 import os
@@ -15,19 +16,31 @@ APP_FILE_DESCRIPTION = "Aplicacion de escritorio para transcripcion local de aud
 APP_TRADEMARK = APP_DISPLAY_NAME
 APP_REPOSITORY_URL = "https://github.com/RenzoFernando/AudiTo.git"
 APP_REPOSITORY_WEB_URL = APP_REPOSITORY_URL[:-4] if APP_REPOSITORY_URL.endswith(".git") else APP_REPOSITORY_URL
-APP_PUBLISHER_URL = APP_REPOSITORY_WEB_URL
+APP_WEBSITE_URL = "https://renzofernando.github.io/AudiTo/"
+APP_CREATOR_URL = "https://github.com/RenzoFernando"
+APP_PUBLISHER_URL = APP_WEBSITE_URL
 APP_SUPPORT_URL = APP_REPOSITORY_WEB_URL
 APP_UPDATES_URL = f"{APP_REPOSITORY_WEB_URL}/releases/latest"
 APP_EXECUTABLE_NAME = f"{APP_NAME_INTERNAL}.exe"
 APP_INSTALLER_NAME = f"{APP_NAME_INTERNAL}-Setup.exe"
 APP_INSTALLER_BASENAME = os.path.splitext(APP_INSTALLER_NAME)[0]
 APP_PORTABLE_ARTIFACT_NAME = f"{APP_NAME_INTERNAL}-Portable.exe"
+APP_LICENSE_FILE_NAME = "LICENSE"
+APP_LICENSE_RELATIVE_PATH = APP_LICENSE_FILE_NAME
 APP_OUTPUT_DIR_NAME = "downloads"
 APP_ASSETS_DIR_NAME = "assets"
 APP_ICON_ICO_RELATIVE_PATH = os.path.join(APP_ASSETS_DIR_NAME, "icon.ico")
 APP_INSTALL_MARKER_FILE = ".audito_installed"
 APP_DATA_ROOT_DIR_NAME = APP_VENDOR_NAME
 APP_DATA_APP_DIR_NAME = APP_NAME_INTERNAL
+
+
+def get_installer_download_url() -> str:
+    return f"{APP_REPOSITORY_WEB_URL}/releases/latest/download/{APP_INSTALLER_NAME}"
+
+
+def get_portable_download_url() -> str:
+    return f"{APP_REPOSITORY_WEB_URL}/releases/latest/download/{APP_PORTABLE_ARTIFACT_NAME}"
 
 
 def get_current_year() -> int:
@@ -57,3 +70,5 @@ def get_legal_copyright_text() -> str:
 APP_FILE_VERSION = get_windows_version(APP_VERSION)
 APP_PRODUCT_VERSION = get_windows_version(APP_VERSION)
 APP_LEGAL_COPYRIGHT = get_legal_copyright_text()
+
+
