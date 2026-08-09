@@ -8,7 +8,7 @@
 
 <p>
   <a href="https://github.com/RenzoFernando/AudiTo/releases/latest">
-    <img src="https://img.shields.io/github/v/release/RenzoFernando/AudiTo?style=for-the-badge&label=VERSIÓN&color=ff4655" alt="Última versión publicada">
+    <img src="https://img.shields.io/github/v/tag/RenzoFernando/AudiTo?sort=semver&style=for-the-badge&label=VERSI%C3%93N&color=ff4655" alt="Versión actual">
   </a>
   <a href="https://github.com/RenzoFernando/AudiTo/releases/latest">
     <img src="https://img.shields.io/badge/VER%20RELEASES-20242b?style=for-the-badge" alt="Ver releases">
