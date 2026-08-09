@@ -6,7 +6,7 @@ from datetime import datetime
 
 APP_NAME_INTERNAL = "AudiTo"
 APP_DISPLAY_NAME = "AudiTo"
-APP_VERSION = "3.1.0"
+APP_VERSION = "3.7.0"
 APP_AUTHOR = "Renzo Fernando Mosquera Daza"
 APP_VENDOR_NAME = "APPS_RenzoFernando"
 APP_COMPANY_NAME = APP_AUTHOR
@@ -70,5 +70,3 @@ def get_legal_copyright_text() -> str:
 APP_FILE_VERSION = get_windows_version(APP_VERSION)
 APP_PRODUCT_VERSION = get_windows_version(APP_VERSION)
 APP_LEGAL_COPYRIGHT = get_legal_copyright_text()
-
-

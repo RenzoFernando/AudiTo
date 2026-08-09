@@ -9,6 +9,7 @@ from PySide6.QtCore import QTimer, Qt, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import QFileDialog, QFrame, QHBoxLayout, QLabel, QMainWindow, QMessageBox, QPushButton, QVBoxLayout, QWidget
 
+from app.app_meta import APP_WEBSITE_URL
 from app.application.current_audio_service import CurrentAudioService
 from app.application.live_transcription_service import LiveTranscriptionService
 from app.application.recording_service import AudioRecordingError, RecordingService
@@ -100,9 +101,13 @@ class MainWindow(QMainWindow):
         brand_row.setSpacing(8)
         brand_row.addWidget(self._accent_group(True))
         brand_row.addStretch(1)
-        brand = QLabel(f"{APP_NAME} v{APP_VERSION}")
+        brand = QLabel(f'<a href="{APP_WEBSITE_URL}" style="color:#ff4655; text-decoration:none;">{APP_NAME} v{APP_VERSION}</a>')
         brand.setObjectName("brandLabel")
         brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        brand.setTextFormat(Qt.TextFormat.RichText)
+        brand.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
+        brand.setOpenExternalLinks(True)
+        brand.setCursor(Qt.CursorShape.PointingHandCursor)
         brand_row.addWidget(brand, 0, Qt.AlignmentFlag.AlignCenter)
         brand_row.addStretch(1)
         brand_row.addWidget(self._accent_group(False))
@@ -345,7 +350,7 @@ class MainWindow(QMainWindow):
         self._apply_state()
 
     def _output_directory(self, show_errors: bool = True) -> Path | None:
-        output_text = self.settings_widget.output_edit.text().strip()
+        output_text = self.settings_widget.output_dir().strip()
         if not output_text:
             if show_errors:
                 QMessageBox.warning(self, self._t("output_folder_title"), self._t("select_output_folder_message"))
@@ -1026,7 +1031,7 @@ class MainWindow(QMainWindow):
         self.cancel_button.setEnabled(can_cancel_model or can_cancel_file or can_cancel_live)
         self.current_audio_widget.set_remove_available(stable and has_audio)
         self.open_file_button.setEnabled(bool(self._last_output_path and self._last_output_path.exists()))
-        self.open_folder_button.setEnabled(bool(self.settings_widget.output_edit.text().strip()))
+        self.open_folder_button.setEnabled(bool(self.settings_widget.output_dir().strip()))
 
     def _is_stable_state(self) -> bool:
         model_download_active = self._model_worker is not None and self._model_worker.isRunning()
@@ -1060,7 +1065,7 @@ class MainWindow(QMainWindow):
                 "ui_language": self._ui_language,
                 "language": self.settings_widget.selected_language(),
                 "profile": self.settings_widget.selected_profile(),
-                "output_dir": self.settings_widget.output_edit.text(),
+                "output_dir": self.settings_widget.output_dir(),
                 "installed_models": installed,
             }
         )
@@ -1176,4 +1181,5 @@ class MainWindow(QMainWindow):
         self.progress_widget.set_indeterminate(self._t("status_closing"), self._t("closing_process_detail"))
         event.ignore()
         self._maybe_finish_close()
+
 
