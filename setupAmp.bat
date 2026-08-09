@@ -21,6 +21,11 @@ del /q "%TEMP%\NuGetCrashReport*" >nul 2>&1
 for /d %%D in ("%TEMP%\NuGetCrashReport*") do rmdir /s /q "%%~fD" >nul 2>&1
 exit /b 0
 
+:cleanup_pip_artifacts
+for /d %%D in ("%VENV_DIR%\Lib\site-packages\~ip*") do rmdir /s /q "%%~fD" >nul 2>&1
+for %%F in ("%VENV_DIR%\Lib\site-packages\~ip*") do del /q "%%~fF" >nul 2>&1
+exit /b 0
+
 :py_fail
 call :cleanup_crash_reports
 echo.
@@ -54,13 +59,21 @@ if not defined PY_CMD goto py_fail
 :py_ok
 echo Python detectado:
 %PY_CMD% --version
+if exist "%VENV_PY%" goto venv_ready
 if exist "%VENV_DIR%" rmdir /s /q "%VENV_DIR%"
+if exist "%VENV_DIR%" goto fail
 %PY_CMD% -m venv "%VENV_DIR%"
 if errorlevel 1 goto fail
-"%VENV_PY%" -m pip install --upgrade pip setuptools wheel --default-timeout=100
+:venv_ready
+call :cleanup_pip_artifacts
+"%VENV_PY%" -m pip --version >nul 2>&1
+if not errorlevel 1 goto pip_ready
+"%VENV_PY%" -m ensurepip --upgrade
 if errorlevel 1 goto fail
-"%VENV_PY%" -m pip install -r "%REQ%" --default-timeout=100
+:pip_ready
+"%VENV_PY%" -m pip install -r "%REQ%" --disable-pip-version-check --default-timeout=100
 if errorlevel 1 goto fail
+call :cleanup_pip_artifacts
 call :cleanup_crash_reports
 echo.
 echo Entorno listo.
