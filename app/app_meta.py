@@ -6,13 +6,13 @@ from datetime import datetime
 
 APP_NAME_INTERNAL = "AudiTo"
 APP_DISPLAY_NAME = "AudiTo"
-APP_VERSION = "3.7.0"
+APP_VERSION = "3.10.0"
 APP_AUTHOR = "Renzo Fernando Mosquera Daza"
 APP_VENDOR_NAME = "APPS_RenzoFernando"
 APP_COMPANY_NAME = APP_AUTHOR
 APP_PUBLISHER_NAME = APP_COMPANY_NAME
 APP_PRODUCT_NAME = APP_DISPLAY_NAME
-APP_FILE_DESCRIPTION = "Aplicacion de escritorio para transcripcion local de audio a texto con Faster-Whisper."
+APP_FILE_DESCRIPTION = "Aplicacion de escritorio para transcripcion de audio a texto con modelos Whisper."
 APP_TRADEMARK = APP_DISPLAY_NAME
 APP_REPOSITORY_URL = "https://github.com/RenzoFernando/AudiTo.git"
 APP_REPOSITORY_WEB_URL = APP_REPOSITORY_URL[:-4] if APP_REPOSITORY_URL.endswith(".git") else APP_REPOSITORY_URL

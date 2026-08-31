@@ -52,7 +52,7 @@ class LiveTranscriptionServiceTests(unittest.TestCase):
                 final = service.finish(120.0)
             text = final.read_text(encoding="utf-8")
             self.assertEqual(text.count("integración continua"), 1)
-            self.assertIn("[00:01:01]", text)
+            self.assertIn("[00:00:57]", text)
             self.assertIn("Ahora veamos el pipeline", text)
 
 

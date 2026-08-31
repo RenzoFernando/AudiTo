@@ -136,6 +136,84 @@ QPushButton:disabled {
     background-color: #14171b;
     border-color: #292f37;
 }
+
+QMenu {
+    background-color: #171a20;
+    border: 1px solid #454c57;
+    border-radius: 4px;
+    padding: 4px;
+    color: #eceef1;
+}
+QMenu::item {
+    min-height: 26px;
+    padding: 0 12px;
+    border-radius: 3px;
+}
+QMenu::item:selected {
+    background-color: #ff4655;
+    color: #ffffff;
+}
+QMenu::separator {
+    height: 1px;
+    margin: 4px 7px;
+    background-color: #343a43;
+}
+QFrame#infoCard {
+    background-color: #171a20;
+    border: 1px solid #343a43;
+    border-radius: 6px;
+}
+QLabel#dialogTitle {
+    color: #ff6572;
+    font-size: 16px;
+    font-weight: 700;
+}
+QLabel#dialogMuted {
+    color: #9096a0;
+    font-size: 9px;
+}
+QLabel#dialogStatus {
+    color: #e8eaed;
+    font-size: 10px;
+    font-weight: 600;
+}
+QLabel#infoCardTitle {
+    color: #b9bec6;
+    font-size: 10px;
+    font-weight: 700;
+}
+QLabel#dialogValue {
+    color: #e8eaed;
+    font-size: 10px;
+}
+QPushButton#dialogSecondaryButton {
+    min-height: 29px;
+    background-color: #1a1e24;
+    border-color: #414852;
+}
+QPushButton#dialogSecondaryButton:hover {
+    border-color: #ff4655;
+    color: #ffffff;
+}
+QPushButton#dialogPrimaryButton {
+    min-height: 32px;
+    background-color: #ff4655;
+    border-color: #ff7f8a;
+    color: #ffffff;
+    font-weight: 700;
+}
+QProgressBar#quotaProgress {
+    min-height: 7px;
+    max-height: 7px;
+    border: none;
+    border-radius: 3px;
+    background-color: #2a2e35;
+}
+QProgressBar#quotaProgress::chunk {
+    background-color: #ff4655;
+    border-radius: 3px;
+}
+
 QPushButton#languageToggleButton {
     min-width: 36px;
     max-width: 36px;
@@ -286,6 +364,34 @@ QPushButton#openFileButton:disabled, QPushButton#openFolderButton:disabled {
     background-color: #14171b;
     border-color: #292f37;
 }
+QPushButton#timestampToggle {
+    min-height: 16px;
+    max-height: 16px;
+    min-width: 0;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    background-color: transparent;
+    color: #c7cbd1;
+    font-size: 9px;
+    font-weight: 500;
+}
+QPushButton#timestampToggle:hover {
+    background-color: transparent;
+    border: none;
+    color: #ffffff;
+}
+QPushButton#timestampToggle:checked {
+    background-color: transparent;
+    border: none;
+    color: #d8dade;
+    font-weight: 600;
+}
+QPushButton#timestampToggle:disabled {
+    background-color: transparent;
+    border: none;
+    color: #5f646d;
+}
 QComboBox, QLineEdit {
     min-height: 30px;
     background-color: #171a20;
@@ -345,4 +451,3 @@ QProgressBar::chunk {
     border-radius: 2px;
 }
 """
-

@@ -38,6 +38,7 @@ class LiveTranscriptionService:
         engine: FasterWhisperEngine | None = None,
         exporter: TxtExporter | None = None,
         merge_service: OverlapMergeService | None = None,
+        timestamps_enabled: bool = True,
     ) -> None:
         self._job = job
         self._buffer = buffer
@@ -46,7 +47,7 @@ class LiveTranscriptionService:
         self._merge_service = merge_service or OverlapMergeService()
         self._logger = logging.getLogger(__name__)
         self._final_path = self._exporter.unique_output_path(output_dir, job.input_path)
-        self._partial_path = self._exporter.start(job, self._final_path)
+        self._partial_path = self._exporter.start(job, self._final_path, timestamps_enabled)
         self._confirmed_until = 0.0
         self._confirmed_tail: list[TranscriptionSegment] = []
 
@@ -109,7 +110,7 @@ class LiveTranscriptionService:
                     TranscriptionSegment(
                         segment.start + snapshot.start_seconds,
                         segment.end + snapshot.start_seconds,
-                        guard.finalize_segment(text),
+                        text,
                     )
                 )
             if cancel_event is not None and cancel_event.is_set():
@@ -141,6 +142,9 @@ class LiveTranscriptionService:
         self._exporter.finish(self._partial_path, self._final_path)
         self._logger.info("Transcripción progresiva finalizada: output=%s duration=%.2f", self._final_path, duration)
         return self._final_path
+
+    def flush_partial(self) -> None:
+        self._exporter.flush(self._partial_path)
 
     def discard_output(self) -> None:
         self._exporter.discard(self._partial_path, self._final_path)

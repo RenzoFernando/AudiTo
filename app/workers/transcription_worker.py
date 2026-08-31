@@ -19,10 +19,13 @@ class TranscriptionWorker(QThread):
     job_cancelled = Signal(str)
     task_finished = Signal()
 
-    def __init__(self, job: TranscriptionJob, output_dir: Path, parent=None) -> None:
+    def __init__(self, job: TranscriptionJob, output_dir: Path, output_name: str | None = None, timestamps_enabled: bool = True, groq_api_key: str | None = None, parent=None) -> None:
         super().__init__(parent)
         self._job = job
         self._output_dir = output_dir
+        self._output_name = output_name
+        self._timestamps_enabled = bool(timestamps_enabled)
+        self._groq_api_key = groq_api_key
         self._cancel_event = threading.Event()
         self._service = TranscriptionService()
 
@@ -40,6 +43,9 @@ class TranscriptionWorker(QThread):
                 self._cancel_event,
                 self._emit_progress,
                 lambda value: self.job_status.emit(self._job.id, value),
+                self._output_name,
+                self._timestamps_enabled,
+                self._groq_api_key,
             )
             self._job.status = JobStatus.COMPLETED
             self._job.progress = 100

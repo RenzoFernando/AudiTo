@@ -27,7 +27,7 @@ def _prepare_environment() -> None:
 def _ensure_dependencies() -> None:
     if getattr(sys, "frozen", False) or "__compiled__" in globals():
         return
-    required = ("PySide6", "faster_whisper", "sounddevice", "huggingface_hub")
+    required = ("PySide6", "faster_whisper", "sounddevice", "huggingface_hub", "av", "groq")
     missing = [module for module in required if importlib.util.find_spec(module) is None]
     if not missing:
         return

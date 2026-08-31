@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from pathlib import Path
 
-from app.constants import CONFIG_VERSION, DEFAULT_LANGUAGE, DEFAULT_PROFILE, DEFAULT_UI_LANGUAGE
+from app.constants import CONFIG_VERSION, DEFAULT_LANGUAGE, DEFAULT_PROFILE, DEFAULT_UI_LANGUAGE, ONLINE_PROFILE_LABEL
 from app.infrastructure.system.app_paths import AppPaths
 
 
@@ -18,6 +18,8 @@ class SettingsRepository:
             "language": DEFAULT_LANGUAGE,
             "profile": DEFAULT_PROFILE,
             "output_dir": str(AppPaths.transcriptions_dir()),
+            "timestamps_enabled": True,
+            "groq_api_key": "",
             "installed_models": [],
         }
 
@@ -40,10 +42,12 @@ class SettingsRepository:
             defaults["ui_language"] = DEFAULT_UI_LANGUAGE
         if defaults["language"] not in {"Español", "Inglés", "Automático"}:
             defaults["language"] = DEFAULT_LANGUAGE
-        if defaults["profile"] not in {"Rápida", "Equilibrada", "Máxima"}:
+        if defaults["profile"] not in {"Rápida", "Equilibrada", "Máxima", ONLINE_PROFILE_LABEL}:
             defaults["profile"] = DEFAULT_PROFILE
         if not str(defaults["output_dir"]).strip():
             defaults["output_dir"] = str(AppPaths.transcriptions_dir())
+        defaults["timestamps_enabled"] = bool(defaults["timestamps_enabled"])
+        defaults["groq_api_key"] = str(defaults.get("groq_api_key", "") or "").strip()
         return defaults
 
     def save(self, settings: dict) -> None:
@@ -53,6 +57,8 @@ class SettingsRepository:
             "language": settings.get("language", DEFAULT_LANGUAGE),
             "profile": settings.get("profile", DEFAULT_PROFILE),
             "output_dir": settings.get("output_dir", str(AppPaths.transcriptions_dir())),
+            "timestamps_enabled": bool(settings.get("timestamps_enabled", True)),
+            "groq_api_key": str(settings.get("groq_api_key", "") or "").strip(),
             "installed_models": list(settings.get("installed_models", [])),
         }
         self._path.parent.mkdir(parents=True, exist_ok=True)

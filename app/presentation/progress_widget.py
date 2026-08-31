@@ -64,14 +64,14 @@ class ProgressWidget(QFrame):
         self.detail_label.setText(detail)
         self._set_state("idle")
 
-    def set_file_progress(self, value: int, detail: str = "") -> None:
+    def set_file_progress(self, value: int, detail: str = "", status: str | None = None) -> None:
         self._stop_waiting_animation()
         self._stop_download_animation()
         value = max(0, min(100, int(value)))
         self.progress.setVisible(True)
         self.progress.setRange(0, 100)
         self.progress.setValue(value)
-        self.status_label.setText(tr(self._ui_language, "status_transcribing", value=value))
+        self.status_label.setText(status if status is not None else tr(self._ui_language, "status_transcribing", value=value))
         self.detail_label.setText(detail)
         self._set_state("idle")
 

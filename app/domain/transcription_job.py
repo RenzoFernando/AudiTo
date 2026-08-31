@@ -22,3 +22,5 @@ class TranscriptionJob:
     error: str | None = None
     created_at: datetime = field(default_factory=datetime.now)
     id: str = field(default_factory=lambda: uuid4().hex)
+    profile_label: str | None = None
+    online: bool = False

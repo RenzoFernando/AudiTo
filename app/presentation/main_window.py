@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import math
+import os
 import time
 from pathlib import Path
 
@@ -13,7 +14,7 @@ from app.app_meta import APP_WEBSITE_URL
 from app.application.current_audio_service import CurrentAudioService
 from app.application.live_transcription_service import LiveTranscriptionService
 from app.application.recording_service import AudioRecordingError, RecordingService
-from app.constants import APP_NAME, APP_VERSION, GITHUB_URL, LANGUAGES, SUPPORTED_AUDIO_EXTENSIONS, WINDOW_HEIGHT, WINDOW_WIDTH
+from app.constants import APP_NAME, APP_VERSION, GITHUB_URL, LANGUAGES, ONLINE_PROFILE_LABEL, SUPPORTED_AUDIO_EXTENSIONS, WINDOW_HEIGHT, WINDOW_WIDTH
 from app.domain.app_state import AppState
 from app.domain.job_status import JobStatus
 from app.domain.model_profile import ModelProfile
@@ -21,6 +22,7 @@ from app.domain.transcription_job import TranscriptionJob
 from app.infrastructure.models.model_repository import ModelRepository
 from app.infrastructure.persistence.settings_repository import SettingsRepository
 from app.presentation.current_audio_widget import CurrentAudioWidget
+from app.presentation.groq_api_dialog import GROQ_KEYS_URL, GROQ_USAGE_URL
 from app.presentation.input_widget import AudioInputWidget
 from app.presentation.progress_widget import ProgressWidget
 from app.presentation.settings_widget import SettingsWidget
@@ -54,6 +56,7 @@ class MainWindow(QMainWindow):
         self._last_output_path: Path | None = None
         self._recording_previous_job: TranscriptionJob | None = None
         self._recording_previous_output_path: Path | None = None
+        self._recording_previous_output_name: str | None = None
         self._live_failed_message: str | None = None
         self._live_speed_factor: float | None = None
         self._discard_restore_pending = False
@@ -94,21 +97,42 @@ class MainWindow(QMainWindow):
         shell_layout.setSpacing(0)
         content = QWidget()
         root = QVBoxLayout(content)
-        root.setContentsMargins(16, 13, 16, 10)
+        root.setContentsMargins(16, 8, 16, 10)
         root.setSpacing(8)
         brand_row = QHBoxLayout()
-        brand_row.setContentsMargins(0, 0, 0, 2)
+        brand_row.setContentsMargins(0, 0, 0, 0)
         brand_row.setSpacing(8)
         brand_row.addWidget(self._accent_group(True))
         brand_row.addStretch(1)
-        brand = QLabel(f'<a href="{APP_WEBSITE_URL}" style="color:#ff4655; text-decoration:none;">{APP_NAME} v{APP_VERSION}</a>')
+        brand_block = QWidget()
+        brand_layout = QVBoxLayout(brand_block)
+        brand_layout.setContentsMargins(0, 0, 0, 0)
+        brand_layout.setSpacing(0)
+        brand = QLabel(
+            f'<a href="{APP_WEBSITE_URL}" style="text-decoration:none;">'
+            f'<span style="color:#ff4655; font-size:21px; font-weight:700;">{APP_NAME}</span></a>'
+        )
         brand.setObjectName("brandLabel")
+        brand.setFixedHeight(23)
         brand.setAlignment(Qt.AlignmentFlag.AlignCenter)
         brand.setTextFormat(Qt.TextFormat.RichText)
         brand.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
         brand.setOpenExternalLinks(True)
         brand.setCursor(Qt.CursorShape.PointingHandCursor)
-        brand_row.addWidget(brand, 0, Qt.AlignmentFlag.AlignCenter)
+        version = QLabel(
+            f'<a href="{APP_WEBSITE_URL}" style="text-decoration:none;">'
+            f'<span style="color:#8b9099; font-size:9px; font-weight:600;">v{APP_VERSION}</span></a>'
+        )
+        version.setObjectName("versionLabel")
+        version.setFixedHeight(11)
+        version.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        version.setTextFormat(Qt.TextFormat.RichText)
+        version.setTextInteractionFlags(Qt.TextInteractionFlag.LinksAccessibleByMouse)
+        version.setOpenExternalLinks(True)
+        version.setCursor(Qt.CursorShape.PointingHandCursor)
+        brand_layout.addWidget(brand, 0, Qt.AlignmentFlag.AlignCenter)
+        brand_layout.addWidget(version, 0, Qt.AlignmentFlag.AlignCenter)
+        brand_row.addWidget(brand_block, 0, Qt.AlignmentFlag.AlignCenter)
         brand_row.addStretch(1)
         brand_row.addWidget(self._accent_group(False))
         root.addLayout(brand_row)
@@ -127,6 +151,8 @@ class MainWindow(QMainWindow):
             self._settings["profile"],
             self._settings["output_dir"],
             self._ui_language,
+            self._settings["timestamps_enabled"],
+            self._settings.get("groq_api_key", ""),
         )
         self.settings_widget.settings_changed.connect(self._update_selected_settings)
         self.settings_widget.preferences_changed.connect(self._preferences_changed)
@@ -214,6 +240,13 @@ class MainWindow(QMainWindow):
     def _runtime_message(self, message: str) -> str:
         return translate_runtime_message(self._ui_language, message)
 
+    def _is_online_profile(self, profile_label: str | None = None) -> bool:
+        label = self.settings_widget.selected_profile() if profile_label is None else profile_label
+        return label == ONLINE_PROFILE_LABEL
+
+    def _groq_api_key(self) -> str:
+        return self.settings_widget.groq_api_key().strip() or str(os.environ.get("GROQ_API_KEY", "")).strip()
+
     def _refresh_static_text(self) -> None:
         self.language_toggle_button.setText(self._t("app_language_code"))
         self.language_toggle_button.setToolTip(self._t("switch_language_tooltip"))
@@ -226,20 +259,27 @@ class MainWindow(QMainWindow):
         self.github_button.setToolTip(self._t("github_tooltip"))
 
     def _selected_model_profile(self) -> ModelProfile:
+        if self._is_online_profile():
+            return ModelProfile.MAXIMUM
         return ModelProfile.from_label(self.settings_widget.selected_profile())
 
     def _selected_model_is_available(self) -> bool:
+        if self._is_online_profile():
+            return True
         try:
             return self._model_repository.is_available(self._selected_model_profile())
         except Exception:
             return False
 
     def _refresh_primary_action_text(self) -> None:
+        online = self._is_online_profile()
         model_available = self._selected_model_is_available()
         has_audio = self._current_audio.job is not None
         key = "transcribe" if model_available else "download_model"
         self.transcribe_button.setText(self._t(key))
-        if not model_available:
+        if online:
+            tooltip_key = "online_transcribe_ready_tooltip" if has_audio else "online_transcribe_needs_audio_tooltip"
+        elif not model_available:
             tooltip_key = "download_model_tooltip"
         elif not has_audio:
             tooltip_key = "transcribe_needs_audio_tooltip"
@@ -252,6 +292,7 @@ class MainWindow(QMainWindow):
             "Rápida": "profile_fast",
             "Equilibrada": "profile_balanced",
             "Máxima": "profile_maximum",
+            ONLINE_PROFILE_LABEL: "profile_online",
         }
         return self._t(keys.get(profile_label, "profile_balanced"))
 
@@ -266,6 +307,8 @@ class MainWindow(QMainWindow):
         )
 
     def _show_model_notice_if_needed(self) -> None:
+        if self._is_online_profile():
+            return
         profile = self._selected_model_profile()
         if self._model_repository.is_available(profile) or profile.label in self._model_notice_profiles:
             return
@@ -323,6 +366,7 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, self._t("incompatible_file_title"), self._t("incompatible_file_message"))
             return
         self._last_output_path = None
+        self.settings_widget.set_output_name(job.input_path.stem)
         self.current_audio_widget.show_audio(job.input_path, job.duration)
         self.progress_widget.set_idle(self._t("status_ready"))
         if ignored_count:
@@ -335,6 +379,7 @@ class MainWindow(QMainWindow):
             return
         self._current_audio.clear()
         self._last_output_path = None
+        self.settings_widget.set_output_name("")
         self.current_audio_widget.show_empty()
         self.progress_widget.set_idle()
         self._set_state(AppState.IDLE)
@@ -372,15 +417,39 @@ class MainWindow(QMainWindow):
                 QMessageBox.warning(self, self._t("output_folder_title"), self._t("cannot_write_folder"))
             return None
 
+    def _transcription_output_name(self, job: TranscriptionJob) -> str | None:
+        output_name = self.settings_widget.output_name().strip()
+        if not output_name:
+            output_name = job.input_path.stem
+            self.settings_widget.set_output_name(output_name)
+        stem = output_name[:-4].rstrip() if output_name.casefold().endswith(".txt") else output_name
+        invalid_chars = '<>:"/\\|?*'
+        reserved = {"con", "prn", "aux", "nul"}
+        reserved.update(f"com{index}" for index in range(1, 10))
+        reserved.update(f"lpt{index}" for index in range(1, 10))
+        reserved_root = stem.split(".", 1)[0].casefold()
+        invalid = (
+            not stem
+            or stem in {".", ".."}
+            or stem.endswith((" ", "."))
+            or any(ord(char) < 32 or char in invalid_chars for char in stem)
+            or reserved_root in reserved
+        )
+        if invalid:
+            QMessageBox.warning(self, self._t("output_name_title"), self._t("invalid_output_name_message"))
+            return None
+        return output_name
+
     def _start_recording(self) -> None:
         if not self._is_stable_state():
             return
         output_dir = self._output_directory()
         if output_dir is None:
             return
+        online = self._is_online_profile()
         profile = self._selected_model_profile()
-        model_available = self._model_repository.is_available(profile)
-        if not model_available:
+        model_available = False if online else self._model_repository.is_available(profile)
+        if not online and not model_available:
             QMessageBox.information(
                 self,
                 self._t("recording_model_missing_title"),
@@ -388,6 +457,7 @@ class MainWindow(QMainWindow):
             )
         self._recording_previous_job = self._current_audio.job
         self._recording_previous_output_path = self._last_output_path
+        self._recording_previous_output_name = self.settings_widget.output_name()
         self._live_failed_message = None
         self._live_speed_factor = None
         self._live_cancel_requested_by_user = False
@@ -399,9 +469,11 @@ class MainWindow(QMainWindow):
         except AudioRecordingError as exc:
             QMessageBox.warning(self, self._t("record_failed_title"), self._runtime_message(str(exc)))
             return
+        self.settings_widget.set_output_name(session.path.stem)
         buffer = self._recording_service.buffer
         if buffer is None:
             self._recording_service.discard()
+            self.settings_widget.set_output_name(self._recording_previous_output_name or "")
             QMessageBox.warning(self, self._t("record_failed_title"), self._t("record_buffer_failed"))
             return
         self._live_service = None
@@ -416,8 +488,14 @@ class MainWindow(QMainWindow):
                 language_code=LANGUAGES.get(language_label),
                 model_profile=ModelProfile.from_label(profile_label),
                 duration=None,
+                profile_label=profile_label,
             )
-            self._live_service = LiveTranscriptionService(live_job, output_dir, buffer)
+            self._live_service = LiveTranscriptionService(
+                live_job,
+                output_dir,
+                buffer,
+                timestamps_enabled=self.settings_widget.timestamps_enabled(),
+            )
             worker = LiveTranscriptionWorker(self._live_service, self)
             worker.live_status.connect(self._on_live_status)
             worker.live_confirmed.connect(self._on_live_confirmed)
@@ -433,7 +511,9 @@ class MainWindow(QMainWindow):
         self._recording_started_at = time.monotonic()
         self.input_widget.set_recording_time(0)
         self._record_timer.start()
-        if model_available:
+        if online:
+            self.progress_widget.set_recording(self._t("recording_online"), self._t("recording_online_detail"))
+        elif model_available:
             self.progress_widget.set_recording(self._t("status_preparing_live"), self._t("live_starts_around"))
         else:
             self.progress_widget.set_recording(self._t("recording_without_model"), self._t("recording_without_model_detail"))
@@ -478,6 +558,13 @@ class MainWindow(QMainWindow):
         )
         self.current_audio_widget.show_audio(job.input_path, job.duration, recorded_audio=True)
         self.current_audio_widget.set_state("recorded")
+        if job.online:
+            self.progress_widget.set_idle(self._t("status_recording_saved"), self._t("press_transcribe_for_txt"))
+            self._recording_service.reset()
+            self._live_service = None
+            self._set_state(AppState.AUDIO_SELECTED)
+            self._save_settings()
+            return
         if not self._model_repository.is_available(job.model_profile):
             self.progress_widget.set_idle(self._t("status_recording_saved"), self._t("recording_saved_model_required"))
             self._recording_service.reset()
@@ -546,8 +633,9 @@ class MainWindow(QMainWindow):
     def _start_transcription(self) -> None:
         if not self._is_stable_state():
             return
+        online = self._is_online_profile()
         selected_profile = self._selected_model_profile()
-        if not self._model_repository.is_available(selected_profile):
+        if not online and not self._model_repository.is_available(selected_profile):
             self._start_model_download(selected_profile)
             return
         job = self._current_audio.job
@@ -561,8 +649,16 @@ class MainWindow(QMainWindow):
         job = self._current_audio.job
         if job is None:
             return
+        groq_api_key = self._groq_api_key() if job.online else None
+        if job.online and not groq_api_key:
+            QMessageBox.information(self, self._t("online_api_key_title"), self._t("online_api_key_required"))
+            self.settings_widget.groq_api_edit.setFocus()
+            return
         output_dir = self._output_directory()
         if output_dir is None:
+            return
+        output_name = self._transcription_output_name(job)
+        if output_name is None:
             return
         job.status = JobStatus.PENDING
         job.progress = 0
@@ -573,7 +669,14 @@ class MainWindow(QMainWindow):
         self._eta_seconds = None
         self.progress_widget.set_file_progress(0, self._t("remaining_calculating"))
         self._set_state(AppState.TRANSCRIBING_FILE)
-        worker = TranscriptionWorker(job, output_dir, self)
+        worker = TranscriptionWorker(
+            job,
+            output_dir,
+            output_name,
+            self.settings_widget.timestamps_enabled(),
+            groq_api_key=groq_api_key,
+            parent=self,
+        )
         worker.job_started.connect(self._on_job_started)
         worker.job_progress.connect(self._on_job_progress)
         worker.job_status.connect(self._on_job_status)
@@ -683,7 +786,13 @@ class MainWindow(QMainWindow):
     def _on_job_started(self, job_id: str) -> None:
         self._file_cancel_requested = False
         self._current_job_id = job_id
-        self.progress_widget.set_indeterminate(self._t("status_preparing_audio"), "")
+        job = self._current_audio.job
+        if job is not None and job.online:
+            self._transcription_started_at = time.monotonic()
+            self._eta_seconds = None
+            self.progress_widget.set_file_progress(0, "", self._t("status_preparing_online_flac"))
+        else:
+            self.progress_widget.set_indeterminate(self._t("status_preparing_audio"), "")
         self._apply_state()
 
     def _on_job_status(self, job_id: str, status: str) -> None:
@@ -705,6 +814,16 @@ class MainWindow(QMainWindow):
         if status == "Cargando modelo":
             self.progress_widget.set_indeterminate(self._t("status_loading_model"), self._t("preparing_transcription"))
             return
+        if status == "GROQ_PREPARING_FLAC":
+            job = self._current_audio.job
+            value = job.progress if job is not None else 0
+            self.progress_widget.set_file_progress(value, "", self._t("status_preparing_online_flac"))
+            return
+        if status == "GROQ_TRANSCRIBING":
+            job = self._current_audio.job
+            value = job.progress if job is not None else 15
+            self.progress_widget.set_file_progress(value, self._t("remaining_calculating"), self._t("status_transcribing_online"))
+            return
         if status == "Transcribiendo":
             self._transcription_started_at = time.monotonic()
             self._eta_seconds = None
@@ -723,6 +842,21 @@ class MainWindow(QMainWindow):
             return
         value = max(0, min(100, int(value)))
         job = self._current_audio.job
+        if job is not None and job.online:
+            detail = self._t("remaining_calculating")
+            if value >= 2 and value < 100 and self._transcription_started_at is not None:
+                elapsed = max(0.1, time.monotonic() - self._transcription_started_at)
+                raw_eta = elapsed * (100 - value) / value
+                if self._eta_seconds is None:
+                    self._eta_seconds = raw_eta
+                else:
+                    self._eta_seconds = self._eta_seconds * 0.72 + raw_eta * 0.28
+                detail = self._t("remaining_approx", remaining=self._format_remaining(self._eta_seconds))
+            elif value >= 100:
+                detail = ""
+            status = self._t("status_preparing_online_flac") if value < 15 else self._t("status_transcribing_online")
+            self.progress_widget.set_file_progress(value, detail, status)
+            return
         duration = job.duration if job is not None else None
         detail = self._t("remaining_calculating")
         if duration and duration > 0:
@@ -770,11 +904,26 @@ class MainWindow(QMainWindow):
         box.setIcon(QMessageBox.Icon.Warning)
         box.setWindowTitle(self._t("transcription_failed_title"))
         box.setText(translated_message)
-        needs_retry = "conéctate a internet" in message.casefold() or "connect to the internet" in message.casefold()
+        normalized_message = message.casefold()
+        needs_retry = "conéctate a internet" in normalized_message or "connect to the internet" in normalized_message
+        invalid_groq_key = "api key de groq no es válida" in normalized_message or "groq api key is invalid" in normalized_message
+        groq_limit_reached = "límite gratuito de groq" in normalized_message or "groq free-tier limit" in normalized_message
         if needs_retry:
             box.setStandardButtons(QMessageBox.StandardButton.Retry | QMessageBox.StandardButton.Close)
             if box.exec() == QMessageBox.StandardButton.Retry:
                 QTimer.singleShot(0, self._start_transcription)
+        elif invalid_groq_key:
+            box.setStandardButtons(QMessageBox.StandardButton.Close)
+            keys_button = box.addButton(self._t("groq_create_new_key"), QMessageBox.ButtonRole.ActionRole)
+            box.exec()
+            if box.clickedButton() is keys_button:
+                QDesktopServices.openUrl(QUrl(GROQ_KEYS_URL))
+        elif groq_limit_reached:
+            box.setStandardButtons(QMessageBox.StandardButton.Close)
+            usage_button = box.addButton(self._t("groq_view_usage_action"), QMessageBox.ButtonRole.ActionRole)
+            box.exec()
+            if box.clickedButton() is usage_button:
+                QDesktopServices.openUrl(QUrl(GROQ_USAGE_URL))
         else:
             box.setStandardButtons(QMessageBox.StandardButton.Close)
             box.exec()
@@ -983,6 +1132,7 @@ class MainWindow(QMainWindow):
         self._live_service = None
         self._current_audio.restore(self._recording_previous_job)
         self._last_output_path = self._recording_previous_output_path
+        self.settings_widget.set_output_name(self._recording_previous_output_name or "")
         job = self._current_audio.job
         if job is None:
             self.current_audio_widget.show_empty()
@@ -999,6 +1149,7 @@ class MainWindow(QMainWindow):
                 self._set_state(AppState.AUDIO_SELECTED)
         self._recording_previous_job = None
         self._recording_previous_output_path = None
+        self._recording_previous_output_name = None
         self._save_settings()
 
     def _set_state(self, state: AppState) -> None:
@@ -1066,6 +1217,8 @@ class MainWindow(QMainWindow):
                 "language": self.settings_widget.selected_language(),
                 "profile": self.settings_widget.selected_profile(),
                 "output_dir": self.settings_widget.output_dir(),
+                "timestamps_enabled": self.settings_widget.timestamps_enabled(),
+                "groq_api_key": self.settings_widget.groq_api_key(),
                 "installed_models": installed,
             }
         )
@@ -1181,5 +1334,3 @@ class MainWindow(QMainWindow):
         self.progress_widget.set_indeterminate(self._t("status_closing"), self._t("closing_process_detail"))
         event.ignore()
         self._maybe_finish_close()
-
-

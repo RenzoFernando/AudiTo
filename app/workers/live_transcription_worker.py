@@ -38,6 +38,8 @@ class LiveTranscriptionWorker(QThread):
                 if self._cancel_event.is_set():
                     if self._discard_output:
                         self._service.discard_output()
+                    else:
+                        self._service.flush_partial()
                     self.live_cancelled.emit()
                     return
                 force = self._finalize_event.is_set()

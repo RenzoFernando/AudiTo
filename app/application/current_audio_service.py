@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from app.constants import LANGUAGES
+from app.constants import LANGUAGES, ONLINE_PROFILE_LABEL
 from app.domain.model_profile import ModelProfile
 from app.domain.transcription_job import TranscriptionJob
 from app.infrastructure.audio.audio_probe import AudioProbe
@@ -29,22 +29,28 @@ class CurrentAudioService:
         if not supported:
             return None, rejected, 0
         path = supported[0]
+        online = profile_label == ONLINE_PROFILE_LABEL
         self._job = TranscriptionJob(
             input_path=path,
             language_label=language_label,
             language_code=LANGUAGES.get(language_label),
-            model_profile=ModelProfile.from_label(profile_label),
+            model_profile=ModelProfile.MAXIMUM if online else ModelProfile.from_label(profile_label),
             duration=self._probe.duration(path),
+            profile_label=profile_label,
+            online=online,
         )
         return self._job, rejected, max(0, len(supported) - 1)
 
     def set_recording(self, path: Path, duration: float, language_label: str, profile_label: str) -> TranscriptionJob:
+        online = profile_label == ONLINE_PROFILE_LABEL
         self._job = TranscriptionJob(
             input_path=path,
             language_label=language_label,
             language_code=LANGUAGES.get(language_label),
-            model_profile=ModelProfile.from_label(profile_label),
+            model_profile=ModelProfile.MAXIMUM if online else ModelProfile.from_label(profile_label),
             duration=duration,
+            profile_label=profile_label,
+            online=online,
         )
         return self._job
 
@@ -59,4 +65,7 @@ class CurrentAudioService:
             return
         self._job.language_label = language_label
         self._job.language_code = LANGUAGES.get(language_label)
-        self._job.model_profile = ModelProfile.from_label(profile_label)
+        online = profile_label == ONLINE_PROFILE_LABEL
+        self._job.model_profile = ModelProfile.MAXIMUM if online else ModelProfile.from_label(profile_label)
+        self._job.profile_label = profile_label
+        self._job.online = online
