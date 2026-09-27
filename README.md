@@ -8,21 +8,17 @@
 
 <p>
   <a href="https://github.com/RenzoFernando/AudiTo/releases/latest">
-    <img src="https://img.shields.io/github/v/tag/RenzoFernando/AudiTo?sort=semver&style=for-the-badge&label=VERSI%C3%93N&color=ff4655" alt="Versión actual">
+    <img src="https://img.shields.io/github/v/release/RenzoFernando/AudiTo?style=for-the-badge&label=VERSI%C3%93N&color=ff4655" alt="Versión actual">
   </a>
   <a href="https://github.com/RenzoFernando/AudiTo/releases/latest">
     <img src="https://img.shields.io/badge/VER%20RELEASES-20242b?style=for-the-badge" alt="Ver releases">
   </a>
   <a href="https://renzofernando.github.io/AudiTo/">
-    <img src="https://img.shields.io/badge/PÁGINA%20OFICIAL-ff4655?style=for-the-badge" alt="Abrir página oficial">
+    <img src="https://img.shields.io/badge/P%C3%81GINA%20OFICIAL-ff4655?style=for-the-badge" alt="Abrir página oficial">
   </a>
 </p>
 
-<strong>Convierte audio en texto directamente en tu computador.</strong>
-
-<br><br>
-
-AudiTo transforma archivos de audio y grabaciones de micrófono en transcripciones TXT mediante modelos Whisper, con perfiles locales y una opción online.
+<strong>Transcribe archivos de audio y grabaciones de micrófono a texto con Whisper.</strong>
 
 </div>
 
@@ -30,72 +26,101 @@ AudiTo transforma archivos de audio y grabaciones de micrófono en transcripcion
 
 ## Descripción
 
-**AudiTo** es una aplicación de escritorio enfocada en convertir audio a texto de forma sencilla, con distintos perfiles de transcripción para adaptarse a cada equipo y necesidad.
+**AudiTo** es una aplicación de escritorio para Windows que convierte audio en transcripciones TXT. Permite trabajar con archivos existentes o grabar desde el micrófono, elegir el idioma de transcripción y usar distintos perfiles según el equilibrio deseado entre velocidad, precisión y consumo de recursos.
 
-Puedes seleccionar un archivo, arrastrarlo sobre la aplicación o grabar desde tu micrófono. AudiTo procesa un audio a la vez y genera un `.txt` organizado, con marcas de tiempo opcionales.
+Los perfiles locales procesan el audio en el computador mediante Faster-Whisper. También existe un perfil Online que utiliza GroqCloud cuando se prefiere procesamiento remoto.
 
-## Funciones principales
+## Características
 
-- **Archivos y arrastrar y soltar:** carga audio desde la interfaz o directamente mediante drag and drop.
-- **Grabación desde micrófono:** guarda la grabación y puede comenzar a transcribir progresivamente mientras continúas hablando.
-- **Cuatro perfiles:** Rápida, Equilibrada, Máxima y Online.
+- **Archivos y arrastrar y soltar:** selecciona un audio desde la interfaz o suéltalo directamente sobre la aplicación.
+- **Grabación desde micrófono:** guarda la grabación y puede iniciar la transcripción de forma progresiva mientras continúas hablando.
+- **Cuatro perfiles de transcripción:** Rápida, Equilibrada, Máxima y Online.
 - **Tres modos de idioma:** Español, Inglés y Automático.
-- **Marcas de tiempo opcionales:** activa o desactiva las referencias temporales del TXT.
-- **Carpeta de salida configurable:** decide dónde guardar transcripciones y grabaciones.
-- **Acceso rápido al resultado:** abre la última transcripción o su carpeta desde AudiTo.
-- **Interfaz en español e inglés:** el idioma visual es independiente del idioma que vas a transcribir.
-- **Procesamiento flexible:** Rápida, Equilibrada y Máxima funcionan localmente; Online está disponible como alternativa mediante GroqCloud.
-- **Descargas de modelos controlables:** la primera descarga muestra progreso y puede cancelarse sin perder la aplicación.
+- **Marcas de tiempo opcionales:** permite incluir o excluir referencias temporales en el TXT.
+- **Carpeta de salida configurable:** define dónde guardar transcripciones y grabaciones.
+- **Acceso rápido al resultado:** abre la última transcripción o su carpeta desde la aplicación.
+- **Interfaz en español e inglés:** el idioma de la interfaz es independiente del idioma del audio.
+- **Descarga controlada de modelos:** la primera descarga muestra progreso y puede cancelarse.
 
 ## Perfiles de transcripción
 
-| Perfil | Modelo | Enfoque |
-| --- | --- | --- |
-| **Rápida** | Whisper Small | Menor consumo y mayor velocidad |
-| **Equilibrada** | Whisper Medium | Balance entre precisión y velocidad |
-| **Máxima** | Whisper Large v3 | Mayor precisión y mayor consumo de recursos |
-| **Online** | Whisper Large v3 · GroqCloud | Procesamiento remoto sin cargar el modelo en el equipo |
+| Perfil | Modelo | Procesamiento | Enfoque |
+| --- | --- | --- | --- |
+| **Rápida** | Whisper Small | Local | Menor consumo y mayor velocidad |
+| **Equilibrada** | Whisper Medium | Local | Balance entre precisión y velocidad |
+| **Máxima** | Whisper Large v3 | Local | Mayor precisión y mayor consumo de recursos |
+| **Online** | Whisper Large v3 · GroqCloud | Remoto | Evita cargar el modelo en el equipo |
 
 Por defecto, AudiTo inicia con **Español** y el perfil **Equilibrada**.
 
 ## Uso
 
-1. Selecciona, arrastra o graba un audio.
-2. Elige el idioma, el perfil de precisión y la carpeta de salida.
-3. Si elegiste un perfil local y el modelo todavía no está disponible, pulsa el botón principal para descargarlo. Si usas Online, configura tu API key de Groq.
+1. Selecciona o arrastra un archivo de audio, o inicia una grabación desde el micrófono.
+2. Elige el idioma, el perfil de transcripción y la carpeta de salida.
+3. Si utilizas un perfil local por primera vez, descarga el modelo cuando la aplicación lo solicite. Para el perfil Online, configura tu API key de Groq.
 4. Pulsa **TRANSCRIBIR**.
-5. Abre el TXT generado o la carpeta de salida directamente desde la aplicación.
+5. Abre el TXT generado o su carpeta directamente desde AudiTo.
 
-Formatos compatibles:
+Formatos de audio compatibles:
 
 `MP3` · `M4A` · `WAV` · `AAC` · `FLAC` · `OGG` · `OPUS` · `WMA` · `AIFF` · `AMR`
 
-La primera vez que uses un perfil local, AudiTo necesita conexión a Internet para obtener su modelo. Los modelos se conservan localmente para usos posteriores. El perfil Online requiere conexión a Internet y una API key propia de Groq.
-
 ## Descarga
 
-AudiTo se publica mediante dos artefactos oficiales con nombres estables:
+AudiTo se distribuye mediante dos artefactos oficiales para Windows:
 
 - **Instalable recomendado:** [`AudiTo-Setup.exe`](https://github.com/RenzoFernando/AudiTo/releases/latest/download/AudiTo-Setup.exe)
 - **Portable:** [`AudiTo-Portable.exe`](https://github.com/RenzoFernando/AudiTo/releases/latest/download/AudiTo-Portable.exe)
+
+El instalable integra la aplicación en Windows y es la opción indicada para uso habitual. El portable puede ejecutarse directamente sin realizar una instalación.
 
 Canales oficiales:
 
 - **Página oficial:** https://renzofernando.github.io/AudiTo/
 - **Última release:** https://github.com/RenzoFernando/AudiTo/releases/latest
-- **Repositorio:** https://github.com/RenzoFernando/AudiTo
-- **Creador:** https://github.com/RenzoFernando
+- **Código fuente:** https://github.com/RenzoFernando/AudiTo
 
-La versión de los ejecutables se obtiene desde `app/app_meta.py`, y la página oficial consulta la última GitHub Release para mostrar la versión publicada y enlazar sus artefactos.
+## Funcionamiento y privacidad
 
-## Privacidad y procesamiento
+Los perfiles **Rápida**, **Equilibrada** y **Máxima** utilizan Faster-Whisper y procesan el audio localmente. La primera vez que se utiliza uno de estos perfiles, AudiTo necesita conexión a Internet para descargar el modelo correspondiente; después, el modelo se conserva en los datos locales de la aplicación para usos posteriores.
 
-Los perfiles **Rápida**, **Equilibrada** y **Máxima** utilizan **Faster-Whisper** y procesan el audio directamente en el computador. El perfil **Online** envía el audio a GroqCloud únicamente cuando se selecciona esa opción.
+El perfil **Online** requiere conexión a Internet y una API key propia de Groq. Cuando se selecciona este perfil, el audio se procesa mediante GroqCloud.
 
-Los modelos descargados se almacenan en los datos locales de AudiTo y pueden reutilizarse sin volver a descargarlos. La API key del perfil Online se configura desde la propia aplicación.
+## Desarrollo
 
-## Licencia
+### Requisitos
 
-AudiTo se distribuye bajo la **MIT License**.
+- Windows.
+- Python 3.11 o 3.12.
+- Git.
+- Conexión a Internet para instalar dependencias.
+- Inno Setup 6 para generar el instalador; `buildinstaller.bat` intenta localizarlo y puede instalarlo mediante `winget` si no está disponible.
 
-Copyright © 2026 · Renzo Fernando Mosquera Daza
+### Preparar el entorno
+
+```batch
+git clone https://github.com/RenzoFernando/AudiTo.git
+cd AudiTo
+setupAmp.bat
+```
+
+### Ejecutar desde código
+
+```batch
+.\.venv\Scripts\python.exe main.py
+```
+
+### Generar artefactos
+
+```batch
+buildportable.bat
+buildinstaller.bat
+```
+
+Los artefactos finales se generan en `downloads/`.
+
+## Autor y licencia
+
+[Renzo Fernando Mosquera Daza](https://github.com/RenzoFernando)
+
+Este proyecto se distribuye bajo la **Licencia MIT**. Consulta [`LICENSE`](LICENSE).
